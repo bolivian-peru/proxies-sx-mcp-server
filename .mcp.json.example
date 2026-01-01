@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "proxies-sx": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "env": {
+        "PROXIES_EMAIL": "your-email@example.com",
+        "PROXIES_PASSWORD": "your-password"
+      }
+    }
+  }
+}

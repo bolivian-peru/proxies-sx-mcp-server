@@ -1,0 +1,29 @@
+# Source files (dist/ is included via files in package.json)
+src/
+
+# Development files
+tsconfig.json
+.eslintrc*
+.prettierrc*
+.editorconfig
+
+# Tests
+tests/
+*.test.ts
+*.spec.ts
+
+# IDE
+.idea/
+.vscode/
+
+# Git
+.git/
+.gitignore
+
+# Development docs (for repo only, not npm)
+CLAUDE.md
+PUBLISHING.md
+
+# Misc
+*.log
+.DS_Store

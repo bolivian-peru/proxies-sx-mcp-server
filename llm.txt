@@ -1,0 +1,181 @@
+# @proxies-sx/mcp-server - AI Agent Context
+
+> MCP server enabling AI agents to manage mobile 4G/5G proxy infrastructure on Proxies.sx
+
+## Quick Start
+
+### Installation
+```bash
+npx @proxies-sx/mcp-server
+```
+
+### Configuration (Claude Desktop)
+```json
+{
+  "mcpServers": {
+    "proxies-sx": {
+      "command": "npx",
+      "args": ["-y", "@proxies-sx/mcp-server"],
+      "env": {
+        "PROXIES_API_KEY": "psx_your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+## Two Authentication Modes
+
+### Mode 1: API Key (Account Required)
+- Create API key at https://client.proxies.sx/account
+- Set `PROXIES_API_KEY` environment variable
+- Scopes: ports:read, ports:write, ports:rotate, billing:read, etc.
+
+### Mode 2: x402 Autonomous Payments (No Account Needed)
+- Fund wallet with USDC on Base or Solana
+- Set `AGENT_WALLET_KEY` environment variable
+- Agents pay directly with crypto - no signup required
+- Uses HTTP 402 Payment Required protocol
+
+## Available Tools (56 Total)
+
+### Account Management
+- `get_account_summary` - Balance, slots, traffic usage
+- `get_account_usage` - Detailed breakdown
+
+### Port Management
+- `list_ports` - List all proxy ports
+- `create_port` - Create new port (country, city, carrier options)
+- `delete_port` - Delete a port
+- `get_port` - Get port details
+- `update_port_credentials` - Change login/password
+- `update_os_fingerprint` - Set OS spoofing (Windows, macOS, iOS, Android)
+- `reconfigure_port` - Change port location
+
+### Status & Monitoring
+- `get_port_status` - Online/offline status
+- `get_port_ip` - Current public IP address
+- `ping_port` - Test connectivity and latency
+- `speed_test_port` - Measure download/upload speed
+
+### IP Rotation
+- `rotate_port` - Rotate to new IP (5min cooldown for shared)
+- `check_rotation_availability` - Check if rotation available
+- `configure_auto_rotation` - Enable auto-rotation (5-1440 min interval)
+- `get_rotation_history` - View past rotations
+- `get_rotation_token_url` - Get public rotation URL
+
+### Billing & Purchases
+- `get_pricing` - Current pricing tiers
+- `purchase_shared_slots` - Buy shared port slots
+- `purchase_shared_traffic` - Buy shared traffic (GB)
+- `purchase_private_slots` - Buy private port slots
+- `purchase_private_traffic` - Buy private traffic (GB)
+
+### Crypto Payments
+- `create_crypto_payment` - Create CoinGate order ($10-$1000)
+- `check_crypto_payment_status` - Check payment status
+- `get_pending_crypto_payments` - List pending payments
+- Supports: BTC, ETH, USDT, USDC, LTC, DOGE, and 50+ more
+
+### Reference Data
+- `list_available_countries` - Available countries
+- `list_carriers_for_country` - Carriers by country
+- `list_cities_for_country` - Cities by country
+- `list_regions_for_country` - Regions by country
+
+### x402 Tools (Autonomous Mode)
+- `x402_get_proxy` - Purchase proxy with USDC
+- `x402_get_pricing` - Calculate cost
+- `x402_wallet_balance` - Check wallet balance
+- `x402_list_sessions` - List active sessions
+- `x402_rotate_ip` - Rotate IP
+- `x402_list_countries` - Available countries
+- `x402_service_status` - Health check
+
+### Support
+- `create_support_ticket` - Create ticket
+- `list_my_tickets` - List tickets
+- `get_ticket` - Get ticket details
+- `reply_to_ticket` - Reply to ticket
+
+## Pricing
+
+### Shared Ports
+- Port: $18/month ($0.025/hour)
+- Traffic: $3.50/GB
+- Example: 1 hour + 1 GB = $3.53
+
+### Private Ports
+- Port: $40/month ($0.056/hour)
+- Traffic: $3.70/GB
+- Dedicated modem, exclusive access
+
+## x402 Payment Flow
+
+```
+1. Agent requests proxy → GET /v1/x402/proxy
+2. Server returns 402 with payment requirements
+3. Agent signs USDC transaction (viem library)
+4. Agent retries with payment-signature header
+5. Server verifies payment on-chain
+6. Server returns proxy credentials + session token
+```
+
+### Supported Networks
+- **Base**: USDC at 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
+- **Solana**: USDC at EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+
+## Example Conversations
+
+### Get a US Proxy (x402 Mode)
+```
+User: I need a US mobile proxy for web scraping
+Agent: [Uses x402_get_pricing, x402_get_proxy]
+
+Purchased proxy for 3.53 USDC:
+HTTP: http://x402_abc:xyz@tmcal1.ddns.net:8500
+SOCKS5: socks5://x402_abc:xyz@tmcal1.ddns.net:5500
+```
+
+### Create Port (API Key Mode)
+```
+User: Create a shared proxy in Germany
+Agent: [Uses list_available_countries, create_port]
+
+Port created in Germany:
+HTTP: http://user:pass@proxy.example.com:8080
+```
+
+### Rotate IP
+```
+User: Rotate the IP on my main proxy
+Agent: [Uses list_ports, rotate_port]
+
+IP rotated successfully! New IP: 185.123.xxx.xxx
+```
+
+## API Base URL
+`https://api.proxies.sx/v1`
+
+## Key Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| GET /v1/ports | List ports |
+| POST /v1/ports | Create port |
+| POST /v1/ports/:id/rotate | Rotate IP |
+| GET /v1/account | Account summary |
+| GET/POST /v1/x402/proxy | Purchase (402 flow) |
+| GET /v1/x402/countries | Available countries |
+
+## Links
+
+- Website: https://proxies.sx
+- Customer Portal: https://client.proxies.sx
+- API Documentation: https://proxies.sx/docs
+- MCP Integration: https://proxies.sx/mcp
+- x402 Protocol: https://proxies.sx/x402
+- npm Package: https://www.npmjs.com/package/@proxies-sx/mcp-server
+- GitHub: https://github.com/proxies-sx/mcp-server
+- Support: maya@proxies.sx
