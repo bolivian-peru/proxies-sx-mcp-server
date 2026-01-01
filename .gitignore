@@ -35,5 +35,8 @@ coverage/
 # Publishing docs (contains npm token - do NOT commit)
 PUBLISHING.md
 
+# Local sync script
+sync-to-repo.sh
+
 # Misc
 *.tgz
