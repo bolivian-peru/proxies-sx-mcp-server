@@ -32,17 +32,20 @@ AI agents can autonomously purchase proxies using USDC on Base or Solana network
 
 ## Installation
 
-### Using npx (Recommended)
+### npm Install
+
+```bash
+# Install globally
+npm install -g @proxies-sx/mcp-server
+
+# Run
+proxies-sx-mcp
+```
+
+### Using npx (No Install)
 
 ```bash
 npx @proxies-sx/mcp-server
-```
-
-### Global Installation
-
-```bash
-npm install -g @proxies-sx/mcp-server
-proxies-sx-mcp
 ```
 
 ### From Source
@@ -472,6 +475,10 @@ npm run lint
 - **MCP Integration**: [proxies.sx/mcp](https://proxies.sx/mcp) - AI agent integration guide
 - **x402 Payments**: [proxies.sx/x402](https://proxies.sx/x402) - Autonomous USDC payment protocol
 - **Support Tickets**: [client.proxies.sx/tickets](https://client.proxies.sx/tickets) - Get help from our team
+
+### Contact & Support
+- **Email**: [maya@proxies.sx](mailto:maya@proxies.sx)
+- **Telegram**: [@sxproxies](https://t.me/sxproxies)
 
 ### x402 Protocol
 - **x402 Specification**: [x402.org](https://x402.org) - HTTP 402 payment protocol
