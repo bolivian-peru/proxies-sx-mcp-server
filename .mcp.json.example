@@ -1,11 +1,10 @@
 {
   "mcpServers": {
     "proxies-sx": {
-      "command": "node",
-      "args": ["dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@proxies-sx/mcp-server"],
       "env": {
-        "PROXIES_EMAIL": "your-email@example.com",
-        "PROXIES_PASSWORD": "your-password"
+        "PROXIES_API_KEY": "psx_your_api_key_here"
       }
     }
   }

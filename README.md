@@ -32,23 +32,43 @@ AI agents can autonomously purchase proxies using USDC on Base or Solana network
 
 ## Installation
 
-### npm Install
+### Option 1: npx (Recommended - No Install)
 
-```bash
-# Install globally
-npm install -g @proxies-sx/mcp-server
-
-# Run
-proxies-sx-mcp
-```
-
-### Using npx (No Install)
+The easiest way to use this MCP server - no installation required:
 
 ```bash
 npx @proxies-sx/mcp-server
 ```
 
-### From Source
+### Option 2: npm Install (Global)
+
+Install globally to use the `proxies-sx-mcp` command anywhere:
+
+```bash
+npm install -g @proxies-sx/mcp-server
+```
+
+After installation, run with:
+
+```bash
+proxies-sx-mcp
+```
+
+### Option 3: npm Install (Local Project)
+
+Add to your project as a dependency:
+
+```bash
+npm install @proxies-sx/mcp-server
+```
+
+Then run with:
+
+```bash
+npx proxies-sx-mcp
+```
+
+### Option 4: From Source
 
 ```bash
 git clone https://github.com/proxies-sx/mcp-server.git
@@ -56,6 +76,39 @@ cd mcp-server
 npm install
 npm run build
 npm start
+```
+
+### What Gets Installed
+
+When you run `npm install @proxies-sx/mcp-server`:
+
+```
+@proxies-sx/mcp-server (904 KB)
+├── @modelcontextprotocol/sdk  (MCP protocol implementation)
+├── viem                       (Ethereum/Base wallet operations)
+└── zod                        (Input validation)
+
+Total: ~88 MB with all dependencies
+```
+
+**Package contents:**
+- `dist/` - Compiled JavaScript + TypeScript definitions
+- `README.md` - Documentation
+- `LICENSE` - MIT License
+- `llm.txt` - AI agent discovery document
+
+---
+
+## Verify Installation
+
+After installing, verify the package works:
+
+```bash
+# Check version
+npm list @proxies-sx/mcp-server
+
+# Test loading (should show "56 tools available")
+node -e "const t = require('@proxies-sx/mcp-server/dist/tools'); console.log(t.allToolDefinitions.length + ' tools available')"
 ```
 
 ---
@@ -483,6 +536,101 @@ npm run lint
 ### x402 Protocol
 - **x402 Specification**: [x402.org](https://x402.org) - HTTP 402 payment protocol
 - **x402 Registry**: [x402scan.com](https://x402scan.com) - Discover x402 services
+
+---
+
+## Troubleshooting
+
+### "Authentication required" Error
+
+This is **expected behavior** when no credentials are provided:
+
+```
+Failed to start MCP server: Authentication required. Set one of:
+  Mode 1 (API Key):
+    - PROXIES_API_KEY: Your API key from https://client.proxies.sx/account
+  Mode 2 (x402 Wallet):
+    - AGENT_WALLET_KEY: Your wallet private key for USDC payments
+```
+
+**Solution:** Provide authentication via environment variable:
+
+```bash
+# With API key
+PROXIES_API_KEY=psx_your_key npx @proxies-sx/mcp-server
+
+# With x402 wallet
+AGENT_WALLET_KEY=0x_your_private_key npx @proxies-sx/mcp-server
+```
+
+### Node.js ExperimentalWarning
+
+If you see this warning on Node.js 23+:
+
+```
+ExperimentalWarning: CommonJS module ... is loading ES Module ... using require()
+```
+
+**This is harmless** - it's a Node.js warning about ESM/CommonJS interop, not an error. To suppress:
+
+```bash
+NODE_NO_WARNINGS=1 npx @proxies-sx/mcp-server
+```
+
+### npm Install Fails
+
+If `npm install` fails:
+
+```bash
+# Clear npm cache
+npm cache clean --force
+
+# Try installing again
+npm install @proxies-sx/mcp-server
+
+# Or use a specific registry
+npm install @proxies-sx/mcp-server --registry https://registry.npmjs.org
+```
+
+### Package Not Found
+
+If you get "package not found" error:
+
+```bash
+# Check if package exists
+npm view @proxies-sx/mcp-server
+
+# Update npm
+npm install -g npm@latest
+
+# Try again
+npm install @proxies-sx/mcp-server
+```
+
+### Verify Package Integrity
+
+```bash
+# Check installed version
+npm list @proxies-sx/mcp-server
+
+# Verify package loads correctly
+node -e "require('@proxies-sx/mcp-server/dist/tools')" && echo "OK"
+
+# Check tool count (should be 45)
+node -e "console.log(require('@proxies-sx/mcp-server/dist/tools').allToolDefinitions.length)"
+```
+
+### Claude Desktop Not Detecting MCP Server
+
+1. Ensure config file is in correct location:
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+2. Verify JSON syntax is valid
+
+3. Restart Claude Desktop completely (quit and reopen)
+
+4. Check Claude Desktop logs for errors
 
 ---
 
