@@ -1,11 +1,24 @@
 /**
- * Billing Tools
- * MCP tools for purchases and pricing
+ * Billing Tools - NEW BUSINESS MODEL (January 2026)
+ *
+ * Changes from old model:
+ * - REMOVED: purchase_shared_slots, purchase_private_slots (slots are now FREE!)
+ * - UPDATED: get_pricing now uses /v1/billing/pricing endpoint with tiers
+ * - ADDED: calculate_price tool for volume discount calculations
+ * - KEPT: purchase_shared_traffic, purchase_private_traffic (but endpoints unchanged)
+ *
+ * Slots unlock automatically based on cumulative GB purchases:
+ * - Starter (0 GB): 5 shared + 1 private
+ * - Bronze (25 GB): 10 shared + 2 private
+ * - Silver (50 GB): 20 shared + 4 private
+ * - Gold (100 GB): 35 shared + 7 private
+ * - Platinum (250 GB): 50 shared + 10 private
+ * - Enterprise (500 GB): 80 shared + 15 private
  */
 
 import { z } from 'zod';
 import type { ProxiesApi } from '../api/index.js';
-import { formatTariff, formatCurrency, formatGB } from '../utils/formatting.js';
+import { formatCurrency, formatGB } from '../utils/formatting.js';
 
 /**
  * Tool definitions for billing
@@ -13,41 +26,34 @@ import { formatTariff, formatCurrency, formatGB } from '../utils/formatting.js';
 export const billingToolDefinitions = [
   {
     name: 'get_pricing',
-    description: 'Get current pricing for slots and traffic (shared and private)',
+    description: 'Get current pricing information including base prices, volume discounts (10-40%), and slot tiers. Shows user\'s current tier and progress to next tier. NEW MODEL: Slots are FREE and unlock based on cumulative GB purchases.',
     inputSchema: {
       type: 'object' as const,
-      properties: {
-        type: {
-          type: 'string',
-          enum: ['slots', 'traffic'],
-          description: 'Filter by type (optional)',
-        },
-        category: {
-          type: 'string',
-          enum: ['shared', 'private'],
-          description: 'Filter by category (optional)',
-        },
-      },
+      properties: {},
       required: [] as string[],
     },
   },
   {
-    name: 'purchase_shared_slots',
-    description: 'Purchase shared port slots using account balance. Each slot allows you to create one shared proxy port.',
+    name: 'calculate_price',
+    description: 'Calculate the exact price for a traffic purchase with volume discounts applied. Discounts: 10% at 25GB, 20% at 50GB, 30% at 100GB, 40% at 250GB+. Base prices: $4/GB shared, $8/GB private.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        quantity: {
+        amount: {
           type: 'number',
-          description: 'Number of slots to purchase',
+          description: 'Amount of GB to calculate price for',
+        },
+        isPrivate: {
+          type: 'boolean',
+          description: 'true for private traffic ($8/GB base), false for shared ($4/GB base)',
         },
       },
-      required: ['quantity'],
+      required: ['amount', 'isPrivate'],
     },
   },
   {
     name: 'purchase_shared_traffic',
-    description: 'Purchase shared traffic in GB using account balance',
+    description: 'Purchase shared traffic in GB using account balance. Base price: $4/GB with volume discounts (10-40%). Purchasing traffic may unlock higher slot tiers automatically.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -60,22 +66,8 @@ export const billingToolDefinitions = [
     },
   },
   {
-    name: 'purchase_private_slots',
-    description: 'Purchase private port slots using account balance. Each slot allows you to create one private (dedicated) proxy port.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        quantity: {
-          type: 'number',
-          description: 'Number of slots to purchase',
-        },
-      },
-      required: ['quantity'],
-    },
-  },
-  {
     name: 'purchase_private_traffic',
-    description: 'Purchase private traffic in GB using account balance',
+    description: 'Purchase private traffic in GB using account balance. Base price: $8/GB (2x shared) with volume discounts (10-40%). Purchasing traffic may unlock higher slot tiers automatically.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -94,63 +86,50 @@ export const billingToolDefinitions = [
  */
 export function createBillingToolHandlers(api: ProxiesApi) {
   return {
-    async get_pricing(args: {
-      type?: 'slots' | 'traffic';
-      category?: 'shared' | 'private';
-    }): Promise<string> {
+    async get_pricing(): Promise<string> {
       try {
-        const tariffs = await api.billing.getTariffs();
+        const pricing = await api.billing.getPricing();
 
-        if (tariffs.length === 0) {
-          return 'No pricing information available.';
+        const lines = [
+          '=== Proxies.sx Pricing (NEW MODEL - FREE Slots!) ===',
+          '',
+          '📦 BASE PRICES:',
+          `  Shared Traffic: ${formatCurrency(pricing.basePrices.shared)}/GB`,
+          `  Private Traffic: ${formatCurrency(pricing.basePrices.private)}/GB`,
+          '',
+          '🎁 SLOTS ARE FREE!',
+          '  Slots unlock based on cumulative GB purchases.',
+          '  Once unlocked, slots never expire!',
+          '',
+          '📊 VOLUME DISCOUNTS:',
+        ];
+
+        for (const discount of pricing.volumeDiscounts) {
+          const range = discount.maxGB
+            ? `${discount.minGB}-${discount.maxGB} GB`
+            : `${discount.minGB}+ GB`;
+          lines.push(`  ${range}: ${discount.discountPercent}% off`);
         }
 
-        // Filter out legacy tariffs and apply filters
-        let filtered = tariffs.filter(t => t.category !== 'legacy');
-
-        if (args.category) {
-          filtered = filtered.filter(t => t.category === args.category);
+        lines.push('');
+        lines.push('🏆 SLOT TIERS:');
+        for (const tier of pricing.slotTiers) {
+          lines.push(`  ${tier.name} (${tier.minGB}+ GB): ${tier.sharedSlots} shared + ${tier.privateSlots} private slots`);
         }
 
-        if (args.type) {
-          const resourceType = args.type === 'slots' ? 'ports' : 'traffic';
-          filtered = filtered.filter(t => t.resourceType === resourceType);
-        }
+        if (pricing.userTierInfo) {
+          const info = pricing.userTierInfo;
+          lines.push('');
+          lines.push('👤 YOUR TIER:');
+          lines.push(`  Current: ${info.currentTier.name}`);
+          lines.push(`  Cumulative GB: ${info.cumulativeGB.toFixed(1)} GB`);
+          lines.push(`  Shared Slots: ${info.sharedSlotLimit}`);
+          lines.push(`  Private Slots: ${info.privateSlotLimit}`);
 
-        if (filtered.length === 0) {
-          return 'No pricing information available for the specified filters.';
-        }
-
-        // Group by category
-        const shared = filtered.filter(t => t.category === 'shared');
-        const private_ = filtered.filter(t => t.category === 'private');
-
-        const lines = ['Current Pricing:'];
-
-        if (shared.length > 0) {
-          lines.push('\nShared:');
-          // Sort by resource type (ports first, then traffic)
-          const sortedShared = shared.sort((a, b) => {
-            if (a.resourceType !== b.resourceType) {
-              return a.resourceType === 'ports' ? -1 : 1;
-            }
-            return 0;
-          });
-          for (const tariff of sortedShared) {
-            lines.push(`  ${formatTariff(tariff)}`);
-          }
-        }
-
-        if (private_.length > 0) {
-          lines.push('\nPrivate:');
-          const sortedPrivate = private_.sort((a, b) => {
-            if (a.resourceType !== b.resourceType) {
-              return a.resourceType === 'ports' ? -1 : 1;
-            }
-            return 0;
-          });
-          for (const tariff of sortedPrivate) {
-            lines.push(`  ${formatTariff(tariff)}`);
+          if (info.nextTier && info.gbToNextTier) {
+            lines.push(`  Next Tier: ${info.nextTier.name} (${info.gbToNextTier.toFixed(1)} GB more)`);
+          } else {
+            lines.push('  🎉 Maximum tier reached!');
           }
         }
 
@@ -160,22 +139,28 @@ export function createBillingToolHandlers(api: ProxiesApi) {
       }
     },
 
-    async purchase_shared_slots(args: { quantity: number }): Promise<string> {
+    async calculate_price(args: { amount: number; isPrivate: boolean }): Promise<string> {
       try {
-        const result = await api.billing.purchaseSharedSlots(args.quantity);
+        const calc = await api.billing.calculatePrice(args.amount, args.isPrivate);
 
-        // Handle both wrapped and direct response formats
-        const purchase = 'purchase' in result ? result.purchase : result;
-
-        return [
-          'Purchase successful!',
+        const lines = [
+          `=== Price Calculation: ${formatGB(calc.amount)} ${calc.isPrivate ? 'Private' : 'Shared'} ===`,
           '',
-          `Purchased: ${args.quantity} shared slot(s)`,
-          `Total: ${formatCurrency(purchase.totalPrice || 0)}`,
-          `Type: ${purchase.type || 'PortsShared'}`,
-        ].join('\n');
+          `Base Price: ${formatCurrency(calc.basePrice)}/GB`,
+          `Volume Discount: ${calc.discountPercent}%`,
+          `Price After Discount: ${formatCurrency(calc.pricePerGB)}/GB`,
+          '',
+          `💰 TOTAL: ${formatCurrency(calc.totalPrice)}`,
+        ];
+
+        if (calc.discountPercent > 0) {
+          const saved = (calc.basePrice * calc.amount) - calc.totalPrice;
+          lines.push(`💵 You Save: ${formatCurrency(saved)}`);
+        }
+
+        return lines.join('\n');
       } catch (error) {
-        throw new Error(`Failed to purchase shared slots: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(`Failed to calculate price: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
 
@@ -185,33 +170,27 @@ export function createBillingToolHandlers(api: ProxiesApi) {
 
         const purchase = 'purchase' in result ? result.purchase : result;
 
-        return [
-          'Purchase successful!',
+        const lines = [
+          '✅ Purchase successful!',
           '',
           `Purchased: ${formatGB(args.quantityGB)} shared traffic`,
           `Total: ${formatCurrency(purchase.totalPrice || 0)}`,
           `Type: ${purchase.type || 'TrafficShared'}`,
-        ].join('\n');
+        ];
+
+        // Check if tier upgrade info is available (future enhancement)
+        if ('tierUpgrade' in result && result.tierUpgrade && typeof result.tierUpgrade === 'object') {
+          const upgrade = result.tierUpgrade as any;
+          lines.push('');
+          lines.push('🎉 TIER UPGRADED!');
+          lines.push(`  Old Tier: ${upgrade.oldTier}`);
+          lines.push(`  New Tier: ${upgrade.newTier}`);
+          lines.push(`  New Slots: ${upgrade.newSlots.shared} shared + ${upgrade.newSlots.private} private`);
+        }
+
+        return lines.join('\n');
       } catch (error) {
         throw new Error(`Failed to purchase shared traffic: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    },
-
-    async purchase_private_slots(args: { quantity: number }): Promise<string> {
-      try {
-        const result = await api.billing.purchasePrivateSlots(args.quantity);
-
-        const purchase = 'purchase' in result ? result.purchase : result;
-
-        return [
-          'Purchase successful!',
-          '',
-          `Purchased: ${args.quantity} private slot(s)`,
-          `Total: ${formatCurrency(purchase.totalPrice || 0)}`,
-          `Type: ${purchase.type || 'PortsPrivate'}`,
-        ].join('\n');
-      } catch (error) {
-        throw new Error(`Failed to purchase private slots: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
 
@@ -221,13 +200,25 @@ export function createBillingToolHandlers(api: ProxiesApi) {
 
         const purchase = 'purchase' in result ? result.purchase : result;
 
-        return [
-          'Purchase successful!',
+        const lines = [
+          '✅ Purchase successful!',
           '',
           `Purchased: ${formatGB(args.quantityGB)} private traffic`,
           `Total: ${formatCurrency(purchase.totalPrice || 0)}`,
           `Type: ${purchase.type || 'TrafficPrivate'}`,
-        ].join('\n');
+        ];
+
+        // Check if tier upgrade info is available (future enhancement)
+        if ('tierUpgrade' in result && result.tierUpgrade && typeof result.tierUpgrade === 'object') {
+          const upgrade = result.tierUpgrade as any;
+          lines.push('');
+          lines.push('🎉 TIER UPGRADED!');
+          lines.push(`  Old Tier: ${upgrade.oldTier}`);
+          lines.push(`  New Tier: ${upgrade.newTier}`);
+          lines.push(`  New Slots: ${upgrade.newSlots.shared} shared + ${upgrade.newSlots.private} private`);
+        }
+
+        return lines.join('\n');
       } catch (error) {
         throw new Error(`Failed to purchase private traffic: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -240,18 +231,13 @@ export function createBillingToolHandlers(api: ProxiesApi) {
  * Zod schemas for validation
  */
 export const billingSchemas = {
-  get_pricing: z.object({
-    type: z.enum(['slots', 'traffic']).optional(),
-    category: z.enum(['shared', 'private']).optional(),
-  }),
-  purchase_shared_slots: z.object({
-    quantity: z.number().min(1),
+  get_pricing: z.object({}),
+  calculate_price: z.object({
+    amount: z.number().min(1),
+    isPrivate: z.boolean(),
   }),
   purchase_shared_traffic: z.object({
     quantityGB: z.number().min(1),
-  }),
-  purchase_private_slots: z.object({
-    quantity: z.number().min(1),
   }),
   purchase_private_traffic: z.object({
     quantityGB: z.number().min(1),

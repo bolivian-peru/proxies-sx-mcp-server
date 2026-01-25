@@ -330,6 +330,66 @@ export interface PurchaseResponse {
 }
 
 // ============================================================================
+// NEW BUSINESS MODEL: Pricing & Tier System (January 2026)
+// ============================================================================
+
+/**
+ * Volume discount tier
+ */
+export interface VolumeDiscount {
+  minGB: number;
+  maxGB: number | null;
+  discountPercent: number;
+}
+
+/**
+ * Slot tier (FREE slots unlocked by cumulative GB purchases)
+ */
+export interface SlotTier {
+  name: string;
+  minGB: number;
+  sharedSlots: number;
+  privateSlots: number;
+}
+
+/**
+ * User's current tier information
+ */
+export interface UserTierInfo {
+  currentTier: SlotTier;
+  nextTier: SlotTier | null;
+  cumulativeGB: number;
+  gbToNextTier: number | null;
+  sharedSlotLimit: number;
+  privateSlotLimit: number;
+}
+
+/**
+ * Complete pricing information
+ */
+export interface PricingInfo {
+  basePrices: {
+    shared: number;
+    private: number;
+  };
+  volumeDiscounts: VolumeDiscount[];
+  slotTiers: SlotTier[];
+  userTierInfo: UserTierInfo | null;
+}
+
+/**
+ * Price calculation result
+ */
+export interface PriceCalculation {
+  basePrice: number;
+  discountPercent: number;
+  pricePerGB: number;
+  totalPrice: number;
+  amount: number;
+  isPrivate: boolean;
+}
+
+// ============================================================================
 // Create Port Types
 // ============================================================================
 

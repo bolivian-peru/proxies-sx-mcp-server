@@ -113,11 +113,10 @@ export function createAllToolHandlers(api: ProxiesApi, baseUrl: string): ToolHan
     get_rotation_history: (args) => rotationHandlers.get_rotation_history(args as Parameters<typeof rotationHandlers.get_rotation_history>[0]),
     get_rotation_token_url: (args) => rotationHandlers.get_rotation_token_url(args as Parameters<typeof rotationHandlers.get_rotation_token_url>[0]),
 
-    // Billing tools
-    get_pricing: (args) => billingHandlers.get_pricing(args as Parameters<typeof billingHandlers.get_pricing>[0]),
-    purchase_shared_slots: (args) => billingHandlers.purchase_shared_slots(args as Parameters<typeof billingHandlers.purchase_shared_slots>[0]),
+    // Billing tools (NEW MODEL - FREE slots)
+    get_pricing: () => billingHandlers.get_pricing(),
+    calculate_price: (args) => billingHandlers.calculate_price(args as Parameters<typeof billingHandlers.calculate_price>[0]),
     purchase_shared_traffic: (args) => billingHandlers.purchase_shared_traffic(args as Parameters<typeof billingHandlers.purchase_shared_traffic>[0]),
-    purchase_private_slots: (args) => billingHandlers.purchase_private_slots(args as Parameters<typeof billingHandlers.purchase_private_slots>[0]),
     purchase_private_traffic: (args) => billingHandlers.purchase_private_traffic(args as Parameters<typeof billingHandlers.purchase_private_traffic>[0]),
 
     // Reference tools
