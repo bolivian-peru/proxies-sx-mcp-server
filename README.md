@@ -240,8 +240,8 @@ The [x402 protocol](https://x402.org) enables machine-to-machine payments using 
 
 | Network | USDC Address | Recipient |
 |---------|--------------|-----------|
-| **Base** | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` | `0xC6C3a87363D5b37d9510202015369086e25558f1` |
-| **Solana** | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | `6qJVQ61ygwjuB7DK94ccrAcxgiQkc2tbbWeNCr3FT2HY` |
+| **Base** | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` | `0xF8cD900794245fc36CBE65be9afc23CDF5103042` |
+| **Solana** | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | `6eUdVwsPArTxwVqEARYGCh4S2qwW2zCs7jSEDRpxydnv` |
 
 ### x402 Tools
 
