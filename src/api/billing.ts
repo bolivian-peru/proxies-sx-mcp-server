@@ -1,6 +1,11 @@
 /**
  * Billing API Module
  * Endpoints for purchases and tariffs
+ *
+ * BUSINESS MODEL UPDATE (Jan 2026):
+ * - Slots are now FREE, unlocked by tier based on cumulative GB purchases
+ * - Slot purchase endpoints are deprecated (kept for backward compatibility)
+ * - Use getPricing() and calculatePrice() for new pricing info
  */
 
 import type { ApiClient } from './client.js';
@@ -23,39 +28,40 @@ export class BillingApi {
   constructor(private readonly client: ApiClient) {}
 
   // ============================================================================
-  // NEW BUSINESS MODEL: Pricing & Tier System (January 2026)
+  // NEW PRICING ENDPOINTS (Jan 2026 Business Model)
   // ============================================================================
 
   /**
-   * Get complete pricing information (NEW MODEL)
-   * Includes base prices, volume discounts, slot tiers, and user's current tier
+   * Get complete pricing information including:
+   * - Base prices ($4/GB shared, $8/GB private)
+   * - Volume discounts (10%, 20%, 30%, 40% based on purchase amount)
+   * - Slot tiers (Starter, Bronze, Silver, Gold, Platinum, Enterprise)
+   * - Current user's tier info
+   *
    * Required scope: billing:read
-   * Endpoint: GET /v1/billing/pricing
    */
   async getPricing(): Promise<PricingInfo> {
     return this.client.get<PricingInfo>('/v1/billing/pricing');
   }
 
   /**
-   * Calculate price with volume discount (NEW MODEL)
+   * Calculate price for a given GB amount with volume discounts applied
+   *
    * Required scope: billing:read
-   * Endpoint: GET /v1/billing/calculate-price
+   *
+   * @param amount - Number of GB to calculate price for
+   * @param isPrivate - true for private traffic, false for shared
    */
-  async calculatePrice(amount: number, isPrivate: boolean): Promise<PriceCalculation> {
+  async calculatePrice(amount: number, isPrivate: boolean = false): Promise<PriceCalculation> {
     return this.client.get<PriceCalculation>('/v1/billing/calculate-price', {
-      amount: amount.toString(),
-      isPrivate: isPrivate.toString(),
+      amount,
+      isPrivate,
     });
   }
-
-  // ============================================================================
-  // DEPRECATED: Old Tariff System (use getPricing() instead)
-  // ============================================================================
 
   /**
    * Get all available tariffs
    * Required scope: billing:read
-   * @deprecated Use getPricing() instead - returns new pricing model with tiers and volume discounts
    */
   async getTariffs(): Promise<Tariff[]> {
     return this.client.get<Tariff[]>('/v1/tariffs');
@@ -70,8 +76,8 @@ export class BillingApi {
   }
 
   /**
-   * Calculate price for a purchase (OLD METHOD - client-side calculation)
-   * @deprecated Use calculatePrice() instead - calls backend API with volume discounts
+   * @deprecated Use calculatePrice() for the new pricing model with volume discounts.
+   * Calculate price for a purchase using legacy tariffs
    */
   calculatePriceFromTariffs(tariffs: Tariff[], params: PurchaseParams): number | null {
     // Map params to backend's resourceType
@@ -102,19 +108,19 @@ export class BillingApi {
     return matchingTariff.pricePerUnit * params.quantity;
   }
 
-  // ============================================================================
-  // DEPRECATED: Slot Purchases (Slots are now FREE in new model)
-  // ============================================================================
-
   /**
+   * @deprecated Slots are now FREE! Use getPricing() to see tier progression.
+   * Slots unlock automatically based on cumulative GB purchases.
+   *
    * Purchase shared slots (port slots)
    * Required scope: billing:write
    * Endpoint: POST /v1/billing/purchase-ports
-   * @deprecated SLOTS ARE NOW FREE! Slots unlock automatically based on cumulative GB purchases.
-   *             Use purchaseSharedTraffic() to buy traffic, which will automatically upgrade your tier.
    */
-  async purchaseSharedSlots(_quantity: number): Promise<PurchaseResponse> {
-    throw new Error('Slot purchases are deprecated. Slots are now FREE and unlock based on traffic purchases. Use purchaseSharedTraffic() instead.');
+  async purchaseSharedSlots(quantity: number): Promise<PurchaseResponse> {
+    console.warn('[DEPRECATED] purchaseSharedSlots: Slots are now FREE! They unlock based on cumulative GB purchases. Use getPricing() to see tier progression.');
+    return this.client.post<PurchaseResponse>('/v1/billing/purchase-ports', {
+      amount: quantity,
+    });
   }
 
   /**
@@ -129,14 +135,18 @@ export class BillingApi {
   }
 
   /**
+   * @deprecated Slots are now FREE! Use getPricing() to see tier progression.
+   * Slots unlock automatically based on cumulative GB purchases.
+   *
    * Purchase private slots (port slots)
    * Required scope: billing:write
    * Endpoint: POST /v1/billing/purchase-ports-private
-   * @deprecated SLOTS ARE NOW FREE! Slots unlock automatically based on cumulative GB purchases.
-   *             Use purchasePrivateTraffic() to buy traffic, which will automatically upgrade your tier.
    */
-  async purchasePrivateSlots(_quantity: number): Promise<PurchaseResponse> {
-    throw new Error('Slot purchases are deprecated. Slots are now FREE and unlock based on traffic purchases. Use purchasePrivateTraffic() instead.');
+  async purchasePrivateSlots(quantity: number): Promise<PurchaseResponse> {
+    console.warn('[DEPRECATED] purchasePrivateSlots: Slots are now FREE! They unlock based on cumulative GB purchases. Use getPricing() to see tier progression.');
+    return this.client.post<PurchaseResponse>('/v1/billing/purchase-ports-private', {
+      amount: quantity,
+    });
   }
 
   /**

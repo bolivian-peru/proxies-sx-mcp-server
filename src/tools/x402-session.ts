@@ -26,12 +26,36 @@ const getSessionStatusSchema = z.object({
   sessionId: z.string().describe('The session ID'),
 });
 
+const replacePortSchema = z.object({
+  sessionToken: z.string().describe('Session token from purchase response'),
+  portId: z.string().optional().describe('Specific port ID to replace (defaults to first offline port)'),
+  country: z.string().optional().describe('Country code for new port (e.g., US)'),
+  city: z.string().optional().describe('City code for new port'),
+  carrier: z.string().optional().describe('Carrier code for new port'),
+});
+
+const topupCalculateSchema = z.object({
+  sessionToken: z.string().describe('Session token from purchase response'),
+  addTrafficGB: z.number().optional().describe('Additional traffic in GB (min 0.1)'),
+  addDurationSeconds: z.number().optional().describe('Additional duration in seconds (min 3600)'),
+});
+
+const topupSessionSchema = z.object({
+  sessionToken: z.string().describe('Session token from purchase response'),
+  paymentSignature: z.string().describe('Blockchain tx hash (Solana signature or Base tx hash)'),
+  addTrafficGB: z.number().optional().describe('Additional traffic in GB'),
+  addDurationSeconds: z.number().optional().describe('Additional duration in seconds'),
+});
+
 export const x402SessionSchemas = {
   get_x402_session: getSessionSchema,
   list_x402_ports: getSessionSchema,
   get_x402_port_status: getPortStatusSchema,
   get_sessions_by_wallet: getSessionByWalletSchema,
   get_session_status: getSessionStatusSchema,
+  replace_x402_port: replacePortSchema,
+  calculate_x402_topup: topupCalculateSchema,
+  topup_x402_session: topupSessionSchema,
 };
 
 // ==================== TOOL DEFINITIONS ====================
@@ -114,6 +138,84 @@ export const x402SessionToolDefinitions = [
         },
       },
       required: ['sessionId'],
+    },
+  },
+  {
+    name: 'replace_x402_port',
+    description: 'Replace an offline/broken proxy port with a new one on a different device. Free, max 3 replacements per session. The broken port is deleted and a new port is created on a different device.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sessionToken: {
+          type: 'string',
+          description: 'Session token from purchase response (starts with x402s_)',
+        },
+        portId: {
+          type: 'string',
+          description: 'Specific port ID to replace (optional - defaults to first offline port)',
+        },
+        country: {
+          type: 'string',
+          description: 'Country code for new port (e.g., US)',
+        },
+        city: {
+          type: 'string',
+          description: 'City code for new port',
+        },
+        carrier: {
+          type: 'string',
+          description: 'Carrier code for new port',
+        },
+      },
+      required: ['sessionToken'],
+    },
+  },
+  {
+    name: 'calculate_x402_topup',
+    description: 'Calculate the cost to top up a session with additional traffic and/or duration. Duration extensions are free, traffic costs $4/GB (shared) or $8/GB (private).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sessionToken: {
+          type: 'string',
+          description: 'Session token from purchase response',
+        },
+        addTrafficGB: {
+          type: 'number',
+          description: 'Additional traffic in GB (min 0.1)',
+        },
+        addDurationSeconds: {
+          type: 'number',
+          description: 'Additional duration in seconds (min 3600 = 1 hour)',
+        },
+      },
+      required: ['sessionToken'],
+    },
+  },
+  {
+    name: 'topup_x402_session',
+    description: 'Top up a session with additional traffic and/or duration. Requires a Payment-Signature (tx hash) for traffic top-ups. Duration-only extensions are free.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sessionToken: {
+          type: 'string',
+          description: 'Session token from purchase response',
+        },
+        paymentSignature: {
+          type: 'string',
+          description: 'Blockchain tx hash (Solana signature or Base tx hash)',
+        },
+        addTrafficGB: {
+          type: 'number',
+          description: 'Additional traffic in GB',
+        },
+        addDurationSeconds: {
+          type: 'number',
+          description: 'Additional duration in seconds',
+        },
+      },
+      required: ['sessionToken', 'paymentSignature'],
     },
   },
 ] as const;
@@ -395,6 +497,131 @@ export function createX402SessionToolHandlers(api: ProxiesApi, _baseUrl: string)
           return 'Session not found. Check the session ID.';
         }
         return `Error fetching session status: ${error.message}`;
+      }
+    },
+
+    /**
+     * Replace an offline/broken port with a new one
+     */
+    async replace_x402_port(args: z.infer<typeof replacePortSchema>): Promise<string> {
+      try {
+        const body: any = {};
+        if (args.portId) body.portId = args.portId;
+        if (args.country) body.country = args.country;
+        if (args.city) body.city = args.city;
+        if (args.carrier) body.carrier = args.carrier;
+
+        const result = await api.client.post<any>(
+          '/x402/manage/ports/replace',
+          body,
+          { 'X-Session-Token': args.sessionToken },
+        );
+
+        return [
+          '# Port Replaced Successfully',
+          '',
+          '## New Proxy Credentials',
+          '```',
+          `HTTP:   ${result.proxy.http}`,
+          `SOCKS5: ${result.proxy.socks5}`,
+          '```',
+          '',
+          `**Port ID:** ${result.portId}`,
+          `**Expires:** ${result.proxy.expiresAt}`,
+          `**Rotation URL:** ${result.rotationUrl}`,
+          '',
+          '## Traffic',
+          `- **Allocated:** ${result.traffic.allocatedGB} GB`,
+          `- **Used:** ${result.traffic.usedGB} GB`,
+          `- **Remaining:** ${result.traffic.remainingGB} GB`,
+          '',
+          `**Location:** ${result.location.country} (${result.location.countryCode})`,
+        ].join('\n');
+      } catch (error: any) {
+        return `Error replacing port: ${error.message}`;
+      }
+    },
+
+    /**
+     * Calculate top-up cost
+     */
+    async calculate_x402_topup(args: z.infer<typeof topupCalculateSchema>): Promise<string> {
+      try {
+        const params: Record<string, string> = {};
+        if (args.addTrafficGB) params.addTrafficGB = String(args.addTrafficGB);
+        if (args.addDurationSeconds) params.addDurationSeconds = String(args.addDurationSeconds);
+
+        const queryString = new URLSearchParams(params).toString();
+        const result = await api.client.get<any>(
+          `/x402/manage/session/topup/calculate?${queryString}`,
+          undefined,
+          { 'X-Session-Token': args.sessionToken },
+        );
+
+        return [
+          '# Top-Up Cost Calculation',
+          '',
+          `**Traffic Cost:** $${result.trafficCost}`,
+          `**Duration Cost:** $${result.durationCost} (duration is free)`,
+          `**Total Cost:** $${result.totalCost} USDC`,
+          '',
+          '## Breakdown',
+          `- **Add Traffic:** ${result.breakdown.addTrafficGB} GB`,
+          `- **Add Duration:** ${result.breakdown.addDurationSeconds} seconds`,
+          `- **Traffic Price:** $${result.breakdown.trafficPricePerGB}/GB`,
+          `- **Tier:** ${result.breakdown.tier}`,
+          '',
+          result.totalCost > 0
+            ? 'Send the total amount in USDC, then call topup_x402_session with the tx hash.'
+            : 'This is a free duration-only extension. Call topup_x402_session with any string as payment signature.',
+        ].join('\n');
+      } catch (error: any) {
+        return `Error calculating top-up cost: ${error.message}`;
+      }
+    },
+
+    /**
+     * Top up a session with additional traffic/duration
+     */
+    async topup_x402_session(args: z.infer<typeof topupSessionSchema>): Promise<string> {
+      try {
+        const body: any = {};
+        if (args.addTrafficGB) body.addTrafficGB = args.addTrafficGB;
+        if (args.addDurationSeconds) body.addDurationSeconds = args.addDurationSeconds;
+
+        const result = await api.client.post<any>(
+          '/x402/manage/session/topup',
+          body,
+          {
+            'X-Session-Token': args.sessionToken,
+            'Payment-Signature': args.paymentSignature,
+          },
+        );
+
+        const lines = [
+          '# Session Topped Up Successfully',
+          '',
+          `**Session ID:** ${result.sessionId}`,
+          `**Traffic Allocated:** ${result.trafficAllocatedGB} GB`,
+          `**New Expiration:** ${result.expiresAt}`,
+          '',
+          '## Payment',
+          `- **TX Hash:** ${result.payment.txHash}`,
+          `- **Network:** ${result.payment.network}`,
+          `- **Amount:** $${result.payment.amountUSDC} USDC`,
+          '',
+        ];
+
+        if (result.ports && result.ports.length > 0) {
+          lines.push('## Updated Ports');
+          for (const port of result.ports) {
+            lines.push(`- **${port.id}** - New expiration: ${port.expiresAt}`);
+          }
+        }
+
+        return lines.join('\n');
+      } catch (error: any) {
+        return `Error topping up session: ${error.message}`;
       }
     },
   };

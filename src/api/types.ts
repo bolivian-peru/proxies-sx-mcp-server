@@ -33,26 +33,9 @@ export interface Country {
   isActive: boolean;
 }
 
-export interface City {
-  _id: string;
-  name: string;
-  countryId: string;
-  isActive: boolean;
-}
-
-export interface Carrier {
-  _id: string;
-  name: string;
-  countryId: string;
-  isActive: boolean;
-}
-
-export interface Region {
-  _id: string;
-  name: string;
-  countryId: string;
-  isActive: boolean;
-}
+// NOTE: City, Carrier, Region types removed - 2026-01-03
+// These reference data endpoints were deprecated as the data was stale.
+// Real device availability is fetched dynamically at port creation time.
 
 // ============================================================================
 // Account Types
@@ -273,6 +256,66 @@ export type PurchaseCategory = 'shared' | 'private';
 export type PaymentMethod = 'balance' | 'card' | 'crypto';
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
 
+// ============================================================================
+// Pricing Types (New Business Model - Jan 2026)
+// ============================================================================
+
+/**
+ * Volume discount tier
+ */
+export interface VolumeDiscount {
+  minGB: number;
+  maxGB: number | null;
+  discountPercent: number;
+}
+
+/**
+ * Slot tier unlocked by cumulative GB purchases
+ */
+export interface SlotTier {
+  name: string;
+  minGB: number;
+  sharedSlots: number;
+  privateSlots: number;
+}
+
+/**
+ * User's current tier information
+ */
+export interface UserTierInfo {
+  currentTier: SlotTier;
+  nextTier: SlotTier | null;
+  cumulativeGB: number;
+  gbToNextTier: number;
+  sharedSlotLimit: number;
+  privateSlotLimit: number;
+}
+
+/**
+ * Complete pricing information from /v1/billing/pricing
+ */
+export interface PricingInfo {
+  basePrices: {
+    shared: number;
+    private: number;
+  };
+  volumeDiscounts: VolumeDiscount[];
+  slotTiers: SlotTier[];
+  userTierInfo: UserTierInfo | null;
+}
+
+/**
+ * Price calculation result from /v1/billing/calculate-price
+ */
+export interface PriceCalculation {
+  basePrice: number;
+  discountPercent: number;
+  pricePerGB: number;
+  totalPrice: number;
+  amount: number;
+  isPrivate: boolean;
+}
+
 /**
  * Raw tariff from backend (before enhancement)
  */
@@ -327,66 +370,6 @@ export interface PurchaseResponse {
   requiresAction?: boolean;
   clientSecret?: string;
   message?: string;
-}
-
-// ============================================================================
-// NEW BUSINESS MODEL: Pricing & Tier System (January 2026)
-// ============================================================================
-
-/**
- * Volume discount tier
- */
-export interface VolumeDiscount {
-  minGB: number;
-  maxGB: number | null;
-  discountPercent: number;
-}
-
-/**
- * Slot tier (FREE slots unlocked by cumulative GB purchases)
- */
-export interface SlotTier {
-  name: string;
-  minGB: number;
-  sharedSlots: number;
-  privateSlots: number;
-}
-
-/**
- * User's current tier information
- */
-export interface UserTierInfo {
-  currentTier: SlotTier;
-  nextTier: SlotTier | null;
-  cumulativeGB: number;
-  gbToNextTier: number | null;
-  sharedSlotLimit: number;
-  privateSlotLimit: number;
-}
-
-/**
- * Complete pricing information
- */
-export interface PricingInfo {
-  basePrices: {
-    shared: number;
-    private: number;
-  };
-  volumeDiscounts: VolumeDiscount[];
-  slotTiers: SlotTier[];
-  userTierInfo: UserTierInfo | null;
-}
-
-/**
- * Price calculation result
- */
-export interface PriceCalculation {
-  basePrice: number;
-  discountPercent: number;
-  pricePerGB: number;
-  totalPrice: number;
-  amount: number;
-  isPrivate: boolean;
 }
 
 // ============================================================================

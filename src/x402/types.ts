@@ -11,7 +11,7 @@ export type X402Network = 'base' | 'solana';
 /**
  * Proxy tier levels
  */
-export type X402Tier = 'shared' | 'dedicated' | 'premium';
+export type X402Tier = 'shared' | 'private';
 
 /**
  * x402 configuration
@@ -180,13 +180,10 @@ export interface SessionCacheData {
  */
 export interface X402Pricing {
   tier: X402Tier;
-  hourlyRate: number;
   trafficRatePerGB: number;
   totalCost: number;
   breakdown: {
-    timeCost: number;
     trafficCost: number;
-    durationHours: number;
     trafficGB: number;
   };
 }

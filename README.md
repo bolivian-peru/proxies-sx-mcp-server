@@ -107,7 +107,7 @@ After installing, verify the package works:
 # Check version
 npm list @proxies-sx/mcp-server
 
-# Test loading (should show "56 tools available")
+# Test loading (should show "59 tools available")
 node -e "const t = require('@proxies-sx/mcp-server/dist/tools'); console.log(t.allToolDefinitions.length + ' tools available')"
 ```
 
@@ -138,7 +138,7 @@ node -e "const t = require('@proxies-sx/mcp-server/dist/tools'); console.log(t.a
 No account needed! The agent uses a crypto wallet to pay directly:
 
 1. Create a wallet on Base or Solana network
-2. Fund it with USDC (minimum $3.53 for 1 hour + 1 GB)
+2. Fund it with USDC (minimum $0.40 for 0.1 GB shared, or $4.00 for 1 GB)
 3. Add a small amount of ETH (Base) or SOL (Solana) for gas fees (~$0.01)
 4. Set `AGENT_WALLET_KEY` to your private key
 
@@ -206,7 +206,7 @@ The [x402 protocol](https://x402.org) enables machine-to-machine payments using 
 │   2. Agent signs USDC payment                ▼                              │
 │   ┌─────────────────────┐       ┌──────────────────────────────────────┐   │
 │   │ Agent Wallet (viem) │       │ Payment Requirements:                │   │
-│   │ Signs ERC-20 permit │       │ - Amount: $3.53 USDC (1hr + 1GB)     │   │
+│   │ Signs ERC-20 permit │       │ - Amount: $4.00 USDC (1GB shared)    │   │
 │   └──────────┬──────────┘       │ - Network: Base or Solana            │   │
 │              │                  │ - Recipient: Proxies.sx wallet       │   │
 │              ▼                  └──────────────────────────────────────┘   │
@@ -231,10 +231,14 @@ The [x402 protocol](https://x402.org) enables machine-to-machine payments using 
 
 ### x402 Pricing
 
-| Tier | Port Price | Traffic Price | Example (1hr + 1GB) |
-|------|------------|---------------|---------------------|
-| **Shared** | $0.025/hr | $3.50/GB | **$3.53** |
-| **Private** | $0.056/hr | $3.70/GB | $3.76 |
+Duration is always **FREE** — you only pay for traffic.
+
+| Tier | Port Price | Traffic Price | Min Purchase |
+|------|------------|---------------|-------------|
+| **Shared** | FREE | **$4.00/GB** | 0.1 GB ($0.40) |
+| **Private** | FREE | **$8.00/GB** | 0.1 GB ($0.80) |
+
+Available countries: **DE, PL, US, FR, ES, GB** (dynamic based on device availability)
 
 ### Supported Networks
 
@@ -243,21 +247,21 @@ The [x402 protocol](https://x402.org) enables machine-to-machine payments using 
 | **Base** | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` | `0xF8cD900794245fc36CBE65be9afc23CDF5103042` |
 | **Solana** | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | `6eUdVwsPArTxwVqEARYGCh4S2qwW2zCs7jSEDRpxydnv` |
 
-### x402 Tools
+### x402 Tools (Detailed)
 
-| Tool | Description |
+| Tool | What It Does |
 |------|-------------|
-| `x402_get_proxy` | Purchase proxy with USDC payment |
-| `x402_get_pricing` | Calculate cost for duration + traffic |
-| `x402_list_sessions` | List active proxy sessions |
-| `x402_check_session` | Get session details by ID |
-| `x402_wallet_balance` | Check USDC wallet balance |
-| `x402_rotate_ip` | Rotate proxy IP address |
-| `x402_list_countries` | Available countries |
-| `x402_list_cities` | Cities in a country |
-| `x402_list_carriers` | Carriers in a country |
-| `x402_extend_session` | Add more time to session |
-| `x402_service_status` | Health check |
+| `x402_get_proxy` | Purchase a mobile proxy automatically. Sends USDC on-chain, waits for confirmation, returns proxy credentials (host, port, username, password, session token, rotation token). Specify country, traffic in GB, and tier (shared/private). |
+| `x402_get_pricing` | Get current pricing tiers — shared $4/GB, private $8/GB. Shows minimum purchase (0.1 GB), duration rules, and available countries with live device counts. |
+| `x402_list_sessions` | List all active proxy sessions for your wallet. Shows session ID, traffic used/remaining, expiration, port count, and status. |
+| `x402_check_session` | Get detailed session info by ID — includes all port credentials, traffic stats, and expiration. Use this to retrieve your proxy details. |
+| `x402_wallet_balance` | Check your USDC balance on Base or Solana. Shows available funds and whether you have enough for a purchase. |
+| `x402_rotate_ip` | Rotate to a new IP address using the rotation token from your proxy purchase. Free, no payment needed. Returns the new IP. |
+| `x402_list_countries` | List countries where proxies are available with live device counts. Currently: DE, PL, US, FR, ES, GB. |
+| `x402_list_cities` | List available cities within a specific country. |
+| `x402_list_carriers` | List mobile carriers available in a country (e.g., AT&T, Verizon, T-Mobile for US). |
+| `x402_extend_session` | Add more traffic or extend duration on an existing session. Calculates cost and sends USDC payment automatically. Traffic: $4/GB shared, $8/GB private. Duration extensions are free. |
+| `x402_service_status` | Health check — verifies the x402 service is running and accepting payments. |
 
 ---
 
@@ -352,15 +356,80 @@ Supported: BTC, ETH, USDT, USDC, LTC, DOGE, TRX, XRP, ADA, SOL, MATIC, AVAX, DOT
 
 ### X402 Session Management Tools
 
-For agents who purchase via x402 protocol:
+For agents who purchase via x402 protocol. Use `X-Session-Token` header for authentication.
 
-| Tool | Description |
+| Tool | What It Does |
 |------|-------------|
-| `get_x402_session` | Get session details and ports using session token |
-| `list_x402_ports` | List all ports in your x402 session |
-| `get_x402_port_status` | Get detailed port status (traffic, expiration) |
-| `get_sessions_by_wallet` | List all sessions for your wallet address |
-| `get_session_status` | Quick status check for a session |
+| `get_x402_session` | Retrieve full session details — all port credentials (host, http_port, socks_port, username, password), traffic used/remaining, expiration, active status. Uses your X-Session-Token from the purchase response. |
+| `list_x402_ports` | List every port in your session with online/offline status, current IP, and traffic consumed per port. |
+| `get_x402_port_status` | Check a single port's detailed status — online/offline, current public IP, traffic used, device info, and expiration time. |
+| `get_sessions_by_wallet` | List all sessions (active and expired) for your wallet address. Useful for recovering session tokens or reviewing history. |
+| `get_session_status` | Quick status check — is the session active, how much traffic remains, when does it expire. |
+| `replace_x402_port` | Replace an offline or broken port with a new one on a **different device**. Completely free, max 3 replacements per session. The failed device is excluded from selection. Use when your proxy stops working. |
+| `calculate_x402_topup` | Preview the cost of extending your session. Specify `addTrafficGB` and/or `addDurationSeconds`. Duration-only extensions are free ($0). Traffic costs $4/GB shared, $8/GB private. |
+| `topup_x402_session` | Pay USDC to extend your session with more traffic or duration. Requires a new on-chain payment. All active ports in the session are automatically extended. Replay-protected (each tx hash can only be used once). |
+
+---
+
+## Browser MCP Server
+
+Separate MCP server for controlling cloud antidetect browsers. Each session includes a **real 4G/5G mobile proxy** automatically — no need to provide your own.
+
+**Package:** `@proxies-sx/browser-mcp`
+**Install:** `npx -y @proxies-sx/browser-mcp`
+**npm:** https://www.npmjs.com/package/@proxies-sx/browser-mcp
+
+**Auto-Proxy:** Mobile proxy auto-allocated from ProxySmart infrastructure. Countries: DE, GB, FR, ES, PL, US. Cleaned up when session ends.
+
+| Tool | What It Does |
+|------|-------------|
+| `browser_create` | Create a new isolated browser session with unique fingerprint. Mobile proxy auto-allocated from 6 countries. Returns session ID, CDP URL, and proxy credentials. |
+| `browser_go` | Navigate browser to a URL. Waits for page load to complete before returning. |
+| `browser_click` | Click an element by CSS selector or coordinates. For buttons, links, and interactive elements. |
+| `browser_type` | Type text into an input field by CSS selector. For form filling and search queries. |
+| `browser_see` | Take a screenshot AND extract all visible text from page. Returns image and DOM text for analysis. |
+| `browser_wait` | Wait for condition: element appears, page loads, network idle, or custom timeout. |
+| `browser_extract` | Extract structured data from page using CSS selectors or XPath. |
+| `browser_save` | Save browser profile (cookies, localStorage, fingerprint) for later reuse. |
+| `browser_end` | End session, clean up resources, release allocated proxy. Always call when done. |
+
+### Claude Desktop Config (Browser)
+
+```json
+{
+  "mcpServers": {
+    "browser": {
+      "command": "npx",
+      "args": ["-y", "@proxies-sx/browser-mcp"],
+      "env": {
+        "BROWSER_API_URL": "https://browser.proxies.sx"
+      }
+    }
+  }
+}
+```
+
+---
+
+## Peer Marketplace — Earn USDC
+
+AI agents can earn USDC by sharing their internet bandwidth as peer proxy nodes.
+
+**Earnings by IP Type:**
+- Mobile IPs: **$0.25/GB** (AT&T, Verizon, T-Mobile, Vodafone)
+- Residential IPs: **$0.15/GB** (Comcast, Spectrum, Cox)
+- Datacenter IPs: **$0.02/GB** (AWS, GCP, Azure, VPNs)
+
+**How it works:**
+1. Register: `POST https://api.proxies.sx/v1/peer/agents/register`
+2. Get JWT token + device ID
+3. Connect to WebSocket relay: `wss://relay.proxies.sx` with `Sec-WebSocket-Protocol: token.{JWT}` header
+4. Route proxy_request messages through your connection
+5. Respond to heartbeat with heartbeat_ack
+6. Earn automatically per GB routed
+
+**Minimum payout:** $5.00 USDC on Solana
+**Full docs:** https://agents.proxies.sx/peer/skill.md
 
 ---
 
@@ -375,7 +444,7 @@ Claude: [Uses x402_get_pricing to calculate cost]
 Claude: [Uses x402_get_proxy with country=US, duration=3600, traffic=1]
 
 I've purchased a US mobile proxy for 1 hour with 1GB traffic.
-Cost: 3.53 USDC (paid from your agent wallet)
+Cost: $4.00 USDC (paid from your agent wallet on Base)
 
 Connection Details:
   HTTP: http://x402_abc123:xyz789@tmcal1.ddns.net:8500
@@ -480,8 +549,13 @@ Use `X-Session-Token` header with the token from purchase response:
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/v1/x402/manage/session` | Get session details + ports |
+| GET | `/v1/x402/manage/session/credit` | Check remaining credit |
 | GET | `/v1/x402/manage/ports` | List all ports in session |
 | GET | `/v1/x402/manage/ports/:id/status` | Get detailed port status |
+| POST | `/v1/x402/manage/ports/recreate` | Recreate deleted port |
+| POST | `/v1/x402/manage/ports/replace` | Replace offline port (free, max 3) |
+| GET | `/v1/x402/manage/session/topup/calculate` | Preview top-up cost |
+| POST | `/v1/x402/manage/session/topup` | Pay to extend session |
 
 ### API Key Endpoints
 
@@ -616,7 +690,7 @@ npm list @proxies-sx/mcp-server
 # Verify package loads correctly
 node -e "require('@proxies-sx/mcp-server/dist/tools')" && echo "OK"
 
-# Check tool count (should be 45)
+# Check tool count (should be 59)
 node -e "console.log(require('@proxies-sx/mcp-server/dist/tools').allToolDefinitions.length)"
 ```
 

@@ -1,19 +1,12 @@
 /**
- * Billing Tools - NEW BUSINESS MODEL (January 2026)
+ * Billing Tools
+ * MCP tools for purchases and pricing
  *
- * Changes from old model:
- * - REMOVED: purchase_shared_slots, purchase_private_slots (slots are now FREE!)
- * - UPDATED: get_pricing now uses /v1/billing/pricing endpoint with tiers
- * - ADDED: calculate_price tool for volume discount calculations
- * - KEPT: purchase_shared_traffic, purchase_private_traffic (but endpoints unchanged)
- *
- * Slots unlock automatically based on cumulative GB purchases:
- * - Starter (0 GB): 5 shared + 1 private
- * - Bronze (25 GB): 10 shared + 2 private
- * - Silver (50 GB): 20 shared + 4 private
- * - Gold (100 GB): 35 shared + 7 private
- * - Platinum (250 GB): 50 shared + 10 private
- * - Enterprise (500 GB): 80 shared + 15 private
+ * BUSINESS MODEL UPDATE (Jan 2026):
+ * - Slots are now FREE, unlocked by tier based on cumulative GB purchases
+ * - Base prices: $4/GB shared, $8/GB private
+ * - Volume discounts: 10% at 25GB, 20% at 50GB, 30% at 100GB, 40% at 250GB
+ * - Tiers: Starter (5+1 slots), Bronze (10+2), Silver (20+4), Gold (35+7), Platinum (50+10), Enterprise (80+15)
  */
 
 import { z } from 'zod';
@@ -26,7 +19,7 @@ import { formatCurrency, formatGB } from '../utils/formatting.js';
 export const billingToolDefinitions = [
   {
     name: 'get_pricing',
-    description: 'Get current pricing information including base prices, volume discounts (10-40%), and slot tiers. Shows user\'s current tier and progress to next tier. NEW MODEL: Slots are FREE and unlock based on cumulative GB purchases.',
+    description: 'Get current pricing including base prices ($4/GB shared, $8/GB private), volume discounts (10-40%), slot tiers, and your current tier progression. Slots are FREE and unlock based on cumulative GB purchases.',
     inputSchema: {
       type: 'object' as const,
       properties: {},
@@ -35,25 +28,25 @@ export const billingToolDefinitions = [
   },
   {
     name: 'calculate_price',
-    description: 'Calculate the exact price for a traffic purchase with volume discounts applied. Discounts: 10% at 25GB, 20% at 50GB, 30% at 100GB, 40% at 250GB+. Base prices: $4/GB shared, $8/GB private.',
+    description: 'Calculate the price for a specific GB amount with volume discounts applied',
     inputSchema: {
       type: 'object' as const,
       properties: {
         amount: {
           type: 'number',
-          description: 'Amount of GB to calculate price for',
+          description: 'Amount of traffic in GB to calculate price for',
         },
         isPrivate: {
           type: 'boolean',
           description: 'true for private traffic ($8/GB base), false for shared ($4/GB base)',
         },
       },
-      required: ['amount', 'isPrivate'],
+      required: ['amount'],
     },
   },
   {
     name: 'purchase_shared_traffic',
-    description: 'Purchase shared traffic in GB using account balance. Base price: $4/GB with volume discounts (10-40%). Purchasing traffic may unlock higher slot tiers automatically.',
+    description: 'Purchase shared traffic in GB using account balance. Buying traffic also unlocks more FREE slot capacity based on tier thresholds.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -67,7 +60,7 @@ export const billingToolDefinitions = [
   },
   {
     name: 'purchase_private_traffic',
-    description: 'Purchase private traffic in GB using account balance. Base price: $8/GB (2x shared) with volume discounts (10-40%). Purchasing traffic may unlock higher slot tiers automatically.',
+    description: 'Purchase private traffic in GB using account balance. Buying traffic also unlocks more FREE slot capacity based on tier thresholds.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -91,15 +84,14 @@ export function createBillingToolHandlers(api: ProxiesApi) {
         const pricing = await api.billing.getPricing();
 
         const lines = [
-          '=== Proxies.sx Pricing (NEW MODEL - FREE Slots!) ===',
+          '=== Proxies.sx Pricing ===',
           '',
           '📦 BASE PRICES:',
-          `  Shared Traffic: ${formatCurrency(pricing.basePrices.shared)}/GB`,
-          `  Private Traffic: ${formatCurrency(pricing.basePrices.private)}/GB`,
+          `  Shared Traffic: $${pricing.basePrices.shared.toFixed(2)}/GB`,
+          `  Private Traffic: $${pricing.basePrices.private.toFixed(2)}/GB`,
           '',
           '🎁 SLOTS ARE FREE!',
           '  Slots unlock based on cumulative GB purchases.',
-          '  Once unlocked, slots never expire!',
           '',
           '📊 VOLUME DISCOUNTS:',
         ];
@@ -111,25 +103,19 @@ export function createBillingToolHandlers(api: ProxiesApi) {
           lines.push(`  ${range}: ${discount.discountPercent}% off`);
         }
 
-        lines.push('');
-        lines.push('🏆 SLOT TIERS:');
+        lines.push('', '🏆 SLOT TIERS:');
         for (const tier of pricing.slotTiers) {
           lines.push(`  ${tier.name} (${tier.minGB}+ GB): ${tier.sharedSlots} shared + ${tier.privateSlots} private slots`);
         }
 
         if (pricing.userTierInfo) {
-          const info = pricing.userTierInfo;
-          lines.push('');
-          lines.push('👤 YOUR TIER:');
-          lines.push(`  Current: ${info.currentTier.name}`);
-          lines.push(`  Cumulative GB: ${info.cumulativeGB.toFixed(1)} GB`);
-          lines.push(`  Shared Slots: ${info.sharedSlotLimit}`);
-          lines.push(`  Private Slots: ${info.privateSlotLimit}`);
-
-          if (info.nextTier && info.gbToNextTier) {
-            lines.push(`  Next Tier: ${info.nextTier.name} (${info.gbToNextTier.toFixed(1)} GB more)`);
-          } else {
-            lines.push('  🎉 Maximum tier reached!');
+          lines.push('', '👤 YOUR TIER:');
+          lines.push(`  Current: ${pricing.userTierInfo.currentTier.name}`);
+          lines.push(`  Cumulative GB: ${pricing.userTierInfo.cumulativeGB.toFixed(1)} GB`);
+          lines.push(`  Shared Slots: ${pricing.userTierInfo.sharedSlotLimit}`);
+          lines.push(`  Private Slots: ${pricing.userTierInfo.privateSlotLimit}`);
+          if (pricing.userTierInfo.nextTier) {
+            lines.push(`  Next Tier: ${pricing.userTierInfo.nextTier.name} (${pricing.userTierInfo.gbToNextTier.toFixed(1)} GB more)`);
           }
         }
 
@@ -139,23 +125,24 @@ export function createBillingToolHandlers(api: ProxiesApi) {
       }
     },
 
-    async calculate_price(args: { amount: number; isPrivate: boolean }): Promise<string> {
+    async calculate_price(args: { amount: number; isPrivate?: boolean }): Promise<string> {
       try {
-        const calc = await api.billing.calculatePrice(args.amount, args.isPrivate);
+        const calculation = await api.billing.calculatePrice(args.amount, args.isPrivate || false);
 
+        const trafficType = calculation.isPrivate ? 'Private' : 'Shared';
         const lines = [
-          `=== Price Calculation: ${formatGB(calc.amount)} ${calc.isPrivate ? 'Private' : 'Shared'} ===`,
+          `=== Price Calculation: ${args.amount} GB ${trafficType} ===`,
           '',
-          `Base Price: ${formatCurrency(calc.basePrice)}/GB`,
-          `Volume Discount: ${calc.discountPercent}%`,
-          `Price After Discount: ${formatCurrency(calc.pricePerGB)}/GB`,
+          `Base Price: $${calculation.basePrice.toFixed(2)}/GB`,
+          `Volume Discount: ${calculation.discountPercent}%`,
+          `Price After Discount: $${calculation.pricePerGB.toFixed(2)}/GB`,
           '',
-          `💰 TOTAL: ${formatCurrency(calc.totalPrice)}`,
+          `💰 TOTAL: $${calculation.totalPrice.toFixed(2)}`,
         ];
 
-        if (calc.discountPercent > 0) {
-          const saved = (calc.basePrice * calc.amount) - calc.totalPrice;
-          lines.push(`💵 You Save: ${formatCurrency(saved)}`);
+        if (calculation.discountPercent > 0) {
+          const savings = (calculation.basePrice * args.amount) - calculation.totalPrice;
+          lines.push(`💵 You Save: $${savings.toFixed(2)}`);
         }
 
         return lines.join('\n');
@@ -166,29 +153,35 @@ export function createBillingToolHandlers(api: ProxiesApi) {
 
     async purchase_shared_traffic(args: { quantityGB: number }): Promise<string> {
       try {
-        const result = await api.billing.purchaseSharedTraffic(args.quantityGB);
+        // Get current tier info before purchase
+        let tierBefore: string | null = null;
+        try {
+          const pricingBefore = await api.billing.getPricing();
+          tierBefore = pricingBefore.userTierInfo?.currentTier.name || null;
+        } catch { /* ignore */ }
 
+        const result = await api.billing.purchaseSharedTraffic(args.quantityGB);
         const purchase = 'purchase' in result ? result.purchase : result;
 
-        const lines = [
+        // Get tier info after purchase
+        let tierMessage = '';
+        try {
+          const pricingAfter = await api.billing.getPricing();
+          const tierAfter = pricingAfter.userTierInfo?.currentTier.name || null;
+          if (tierBefore && tierAfter && tierBefore !== tierAfter) {
+            tierMessage = `\n🎉 TIER UPGRADED: ${tierBefore} → ${tierAfter}!`;
+          } else if (pricingAfter.userTierInfo?.nextTier) {
+            tierMessage = `\n📈 Progress: ${pricingAfter.userTierInfo.gbToNextTier.toFixed(1)} GB to ${pricingAfter.userTierInfo.nextTier.name}`;
+          }
+        } catch { /* ignore */ }
+
+        return [
           '✅ Purchase successful!',
           '',
           `Purchased: ${formatGB(args.quantityGB)} shared traffic`,
           `Total: ${formatCurrency(purchase.totalPrice || 0)}`,
-          `Type: ${purchase.type || 'TrafficShared'}`,
-        ];
-
-        // Check if tier upgrade info is available (future enhancement)
-        if ('tierUpgrade' in result && result.tierUpgrade && typeof result.tierUpgrade === 'object') {
-          const upgrade = result.tierUpgrade as any;
-          lines.push('');
-          lines.push('🎉 TIER UPGRADED!');
-          lines.push(`  Old Tier: ${upgrade.oldTier}`);
-          lines.push(`  New Tier: ${upgrade.newTier}`);
-          lines.push(`  New Slots: ${upgrade.newSlots.shared} shared + ${upgrade.newSlots.private} private`);
-        }
-
-        return lines.join('\n');
+          tierMessage,
+        ].filter(Boolean).join('\n');
       } catch (error) {
         throw new Error(`Failed to purchase shared traffic: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -196,29 +189,35 @@ export function createBillingToolHandlers(api: ProxiesApi) {
 
     async purchase_private_traffic(args: { quantityGB: number }): Promise<string> {
       try {
-        const result = await api.billing.purchasePrivateTraffic(args.quantityGB);
+        // Get current tier info before purchase
+        let tierBefore: string | null = null;
+        try {
+          const pricingBefore = await api.billing.getPricing();
+          tierBefore = pricingBefore.userTierInfo?.currentTier.name || null;
+        } catch { /* ignore */ }
 
+        const result = await api.billing.purchasePrivateTraffic(args.quantityGB);
         const purchase = 'purchase' in result ? result.purchase : result;
 
-        const lines = [
+        // Get tier info after purchase
+        let tierMessage = '';
+        try {
+          const pricingAfter = await api.billing.getPricing();
+          const tierAfter = pricingAfter.userTierInfo?.currentTier.name || null;
+          if (tierBefore && tierAfter && tierBefore !== tierAfter) {
+            tierMessage = `\n🎉 TIER UPGRADED: ${tierBefore} → ${tierAfter}!`;
+          } else if (pricingAfter.userTierInfo?.nextTier) {
+            tierMessage = `\n📈 Progress: ${pricingAfter.userTierInfo.gbToNextTier.toFixed(1)} GB to ${pricingAfter.userTierInfo.nextTier.name}`;
+          }
+        } catch { /* ignore */ }
+
+        return [
           '✅ Purchase successful!',
           '',
           `Purchased: ${formatGB(args.quantityGB)} private traffic`,
           `Total: ${formatCurrency(purchase.totalPrice || 0)}`,
-          `Type: ${purchase.type || 'TrafficPrivate'}`,
-        ];
-
-        // Check if tier upgrade info is available (future enhancement)
-        if ('tierUpgrade' in result && result.tierUpgrade && typeof result.tierUpgrade === 'object') {
-          const upgrade = result.tierUpgrade as any;
-          lines.push('');
-          lines.push('🎉 TIER UPGRADED!');
-          lines.push(`  Old Tier: ${upgrade.oldTier}`);
-          lines.push(`  New Tier: ${upgrade.newTier}`);
-          lines.push(`  New Slots: ${upgrade.newSlots.shared} shared + ${upgrade.newSlots.private} private`);
-        }
-
-        return lines.join('\n');
+          tierMessage,
+        ].filter(Boolean).join('\n');
       } catch (error) {
         throw new Error(`Failed to purchase private traffic: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -234,7 +233,7 @@ export const billingSchemas = {
   get_pricing: z.object({}),
   calculate_price: z.object({
     amount: z.number().min(1),
-    isPrivate: z.boolean(),
+    isPrivate: z.boolean().optional(),
   }),
   purchase_shared_traffic: z.object({
     quantityGB: z.number().min(1),

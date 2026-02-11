@@ -12,9 +12,9 @@ export const x402ToolDefinitions = [
   {
     name: 'x402_get_proxy',
     description:
-      'Purchase a mobile proxy instantly using USDC on Base blockchain. No API key needed - payment is authentication. ' +
+      'Purchase a mobile proxy instantly using USDC on Base or Solana. No API key needed - payment is authentication. ' +
       'Returns proxy credentials (HTTP/SOCKS5) immediately after on-chain payment confirmation. ' +
-      'Cost: ~$3.53 for 1 hour + 1 GB (shared tier).',
+      'Cost: $4.00/GB shared, $8.00/GB private. Duration is FREE. Min purchase: 0.1 GB ($0.40).',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -33,9 +33,9 @@ export const x402ToolDefinitions = [
         },
         tier: {
           type: 'string',
-          enum: ['shared', 'dedicated', 'premium'],
+          enum: ['shared', 'private'],
           description:
-            'Proxy tier. shared=$0.03/hr+$3.50/GB, dedicated=$0.10/hr+$3.00/GB, premium=$0.25/hr+$2.50/GB. Default: shared',
+            'Proxy tier. shared=$4.00/GB, private=$8.00/GB (exclusive device). Duration is FREE. Default: shared',
         },
         city: {
           type: 'string',
@@ -52,21 +52,17 @@ export const x402ToolDefinitions = [
   {
     name: 'x402_get_pricing',
     description:
-      'Calculate pricing for x402 proxy purchase before buying. Shows cost breakdown by duration and traffic.',
+      'Calculate pricing for x402 proxy purchase before buying. Duration is FREE - you only pay for traffic (shared=$4/GB, private=$8/GB).',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        duration_hours: {
-          type: 'number',
-          description: 'Duration in hours. Default: 1',
-        },
         traffic_gb: {
           type: 'number',
           description: 'Traffic in GB. Default: 1',
         },
         tier: {
           type: 'string',
-          enum: ['shared', 'dedicated', 'premium'],
+          enum: ['shared', 'private'],
           description: 'Proxy tier. Default: shared',
         },
       },
@@ -204,15 +200,14 @@ export const x402Schemas = {
   x402_get_proxy: z.object({
     country: z.string().min(2).max(3),
     duration_hours: z.number().min(1).max(720).optional(),
-    traffic_gb: z.number().min(1).max(100).optional(),
-    tier: z.enum(['shared', 'dedicated', 'premium']).optional(),
+    traffic_gb: z.number().min(0.1).max(100).optional(),
+    tier: z.enum(['shared', 'private']).optional(),
     city: z.string().optional(),
     carrier: z.string().optional(),
   }),
   x402_get_pricing: z.object({
-    duration_hours: z.number().min(1).max(720).optional(),
-    traffic_gb: z.number().min(1).max(100).optional(),
-    tier: z.enum(['shared', 'dedicated', 'premium']).optional(),
+    traffic_gb: z.number().min(0.1).max(100).optional(),
+    tier: z.enum(['shared', 'private']).optional(),
   }),
   x402_list_sessions: z.object({}),
   x402_check_session: z.object({

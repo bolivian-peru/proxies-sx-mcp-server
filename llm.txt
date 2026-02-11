@@ -37,7 +37,7 @@ npx @proxies-sx/mcp-server
 - Agents pay directly with crypto - no signup required
 - Uses HTTP 402 Payment Required protocol
 
-## Available Tools (56 Total)
+## Available Tools (55 Total)
 
 ### Account Management
 - `get_account_summary` - Balance, slots, traffic usage
@@ -93,6 +93,16 @@ npx @proxies-sx/mcp-server
 - `x402_list_countries` - Available countries
 - `x402_service_status` - Health check
 
+### x402 Session Management
+- `get_x402_session` - Session details by token
+- `list_x402_ports` - Ports in session
+- `get_x402_port_status` - Port status
+- `get_sessions_by_wallet` - Sessions by wallet
+- `get_session_status` - Quick session status
+- `replace_x402_port` - Replace offline port (free, max 3 per session)
+- `calculate_x402_topup` - Preview cost to add traffic/duration
+- `topup_x402_session` - Pay to extend session (USDC on Base/Solana)
+
 ### Support
 - `create_support_ticket` - Create ticket
 - `list_my_tickets` - List tickets
@@ -101,14 +111,15 @@ npx @proxies-sx/mcp-server
 
 ## Pricing
 
-### Shared Ports
-- Port: $18/month ($0.025/hour)
-- Traffic: $3.50/GB
-- Example: 1 hour + 1 GB = $3.53
+Duration is always FREE — you only pay for traffic.
 
-### Private Ports
-- Port: $40/month ($0.056/hour)
-- Traffic: $3.70/GB
+### Shared
+- Traffic: $4.00/GB
+- Min purchase: 0.1 GB ($0.40)
+
+### Private
+- Traffic: $8.00/GB
+- Min purchase: 0.1 GB ($0.80)
 - Dedicated modem, exclusive access
 
 ## x402 Payment Flow
@@ -133,7 +144,7 @@ npx @proxies-sx/mcp-server
 User: I need a US mobile proxy for web scraping
 Agent: [Uses x402_get_pricing, x402_get_proxy]
 
-Purchased proxy for 3.53 USDC:
+Purchased proxy for 0.40 USDC (0.1 GB shared):
 HTTP: http://x402_abc:xyz@tmcal1.ddns.net:8500
 SOCKS5: socks5://x402_abc:xyz@tmcal1.ddns.net:5500
 ```
@@ -168,6 +179,9 @@ IP rotated successfully! New IP: 185.123.xxx.xxx
 | GET /v1/account | Account summary |
 | GET/POST /v1/x402/proxy | Purchase (402 flow) |
 | GET /v1/x402/countries | Available countries |
+| POST /v1/x402/manage/ports/replace | Replace offline port (free, max 3) |
+| GET /v1/x402/manage/session/topup/calculate | Preview top-up cost |
+| POST /v1/x402/manage/session/topup | Pay to extend session |
 
 ## Links
 

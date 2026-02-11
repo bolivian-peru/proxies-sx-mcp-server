@@ -113,17 +113,14 @@ export function createAllToolHandlers(api: ProxiesApi, baseUrl: string): ToolHan
     get_rotation_history: (args) => rotationHandlers.get_rotation_history(args as Parameters<typeof rotationHandlers.get_rotation_history>[0]),
     get_rotation_token_url: (args) => rotationHandlers.get_rotation_token_url(args as Parameters<typeof rotationHandlers.get_rotation_token_url>[0]),
 
-    // Billing tools (NEW MODEL - FREE slots)
+    // Billing tools (Slots are FREE - Jan 2026 business model update)
     get_pricing: () => billingHandlers.get_pricing(),
     calculate_price: (args) => billingHandlers.calculate_price(args as Parameters<typeof billingHandlers.calculate_price>[0]),
     purchase_shared_traffic: (args) => billingHandlers.purchase_shared_traffic(args as Parameters<typeof billingHandlers.purchase_shared_traffic>[0]),
     purchase_private_traffic: (args) => billingHandlers.purchase_private_traffic(args as Parameters<typeof billingHandlers.purchase_private_traffic>[0]),
 
-    // Reference tools
+    // Reference tools (cities, carriers, regions removed - 2026-01-03)
     list_available_countries: (args) => referenceHandlers.list_available_countries(args as Parameters<typeof referenceHandlers.list_available_countries>[0]),
-    list_carriers_for_country: (args) => referenceHandlers.list_carriers_for_country(args as Parameters<typeof referenceHandlers.list_carriers_for_country>[0]),
-    list_cities_for_country: (args) => referenceHandlers.list_cities_for_country(args as Parameters<typeof referenceHandlers.list_cities_for_country>[0]),
-    list_regions_for_country: (args) => referenceHandlers.list_regions_for_country(args as Parameters<typeof referenceHandlers.list_regions_for_country>[0]),
 
     // Utility tools
     get_proxy_connection_string: (args) => utilityHandlers.get_proxy_connection_string(args as Parameters<typeof utilityHandlers.get_proxy_connection_string>[0]),
@@ -150,6 +147,9 @@ export function createAllToolHandlers(api: ProxiesApi, baseUrl: string): ToolHan
     get_x402_port_status: (args) => x402SessionHandlers.get_x402_port_status(args as Parameters<typeof x402SessionHandlers.get_x402_port_status>[0]),
     get_sessions_by_wallet: (args) => x402SessionHandlers.get_sessions_by_wallet(args as Parameters<typeof x402SessionHandlers.get_sessions_by_wallet>[0]),
     get_session_status: (args) => x402SessionHandlers.get_session_status(args as Parameters<typeof x402SessionHandlers.get_session_status>[0]),
+    replace_x402_port: (args) => x402SessionHandlers.replace_x402_port(args as Parameters<typeof x402SessionHandlers.replace_x402_port>[0]),
+    calculate_x402_topup: (args) => x402SessionHandlers.calculate_x402_topup(args as Parameters<typeof x402SessionHandlers.calculate_x402_topup>[0]),
+    topup_x402_session: (args) => x402SessionHandlers.topup_x402_session(args as Parameters<typeof x402SessionHandlers.topup_x402_session>[0]),
   };
 }
 

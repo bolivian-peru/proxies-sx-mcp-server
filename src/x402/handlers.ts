@@ -9,12 +9,24 @@ import type { X402SessionCache } from './session-cache.js';
 import type { X402Tier } from './types.js';
 
 /**
- * Pricing rates by tier
+ * Structured error response for tool handlers
  */
-const PRICING_RATES: Record<X402Tier, { hourly: number; perGB: number }> = {
-  shared: { hourly: 0.03, perGB: 3.5 },
-  dedicated: { hourly: 0.1, perGB: 3.0 },
-  premium: { hourly: 0.25, perGB: 2.5 },
+function toolError(tool: string, message: string, retryable: boolean, suggestion?: string): string {
+  return JSON.stringify({
+    error: true,
+    tool,
+    message,
+    retryable,
+    suggestion: suggestion || (retryable ? 'Wait a moment and retry' : 'Check parameters and try again'),
+  });
+}
+
+/**
+ * Pricing rates by tier - Duration is FREE, pay only for traffic
+ */
+const PRICING_RATES: Record<X402Tier, { perGB: number }> = {
+  shared: { perGB: 4.0 },
+  private: { perGB: 8.0 },
 };
 
 /**
@@ -47,9 +59,9 @@ export function createX402ToolHandlers(
         const balance = await wallet.getBalance();
         const balanceNum = Number(balance.usdc) / 1e6;
 
-        // Calculate expected cost
+        // Calculate expected cost - duration is FREE, only pay for traffic
         const rates = PRICING_RATES[tier];
-        const expectedCost = durationHours * rates.hourly + trafficGB * rates.perGB;
+        const expectedCost = trafficGB * rates.perGB;
 
         if (balanceNum < expectedCost) {
           return [
@@ -117,7 +129,13 @@ export function createX402ToolHandlers(
         ].join('\n');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        return `Failed to purchase proxy: ${message}`;
+        const isBalance = message.toLowerCase().includes('insufficient') || message.toLowerCase().includes('balance');
+        return toolError(
+          'x402_get_proxy',
+          message,
+          !isBalance,
+          isBalance ? `Top up your wallet with USDC on Base: ${wallet.address}` : 'Check country code and retry',
+        );
       }
     },
 
@@ -125,18 +143,14 @@ export function createX402ToolHandlers(
      * Get pricing information
      */
     async x402_get_pricing(args: {
-      duration_hours?: number;
       traffic_gb?: number;
       tier?: X402Tier;
     }): Promise<string> {
-      const durationHours = args.duration_hours || 1;
       const trafficGB = args.traffic_gb || 1;
       const tier = args.tier || 'shared';
 
       const rates = PRICING_RATES[tier];
-      const timeCost = durationHours * rates.hourly;
-      const trafficCost = trafficGB * rates.perGB;
-      const total = timeCost + trafficCost;
+      const total = trafficGB * rates.perGB;
 
       // Get current balance
       let balanceInfo = '';
@@ -157,16 +171,17 @@ export function createX402ToolHandlers(
         `x402 Proxy Pricing`,
         ``,
         `Tier: ${tier}`,
-        `Duration: ${durationHours} hour(s) x $${rates.hourly.toFixed(2)}/hr = $${timeCost.toFixed(2)}`,
-        `Traffic: ${trafficGB} GB x $${rates.perGB.toFixed(2)}/GB = $${trafficCost.toFixed(2)}`,
+        `Duration: FREE (included)`,
+        `Traffic: ${trafficGB} GB x $${rates.perGB.toFixed(2)}/GB = $${total.toFixed(2)}`,
         `${'─'.repeat(40)}`,
         `Total: $${total.toFixed(2)} USDC`,
         balanceInfo,
         ``,
-        `All Tier Rates:`,
-        `  shared:    $0.03/hr + $3.50/GB (best for short tasks)`,
-        `  dedicated: $0.10/hr + $3.00/GB (exclusive device)`,
-        `  premium:   $0.25/hr + $2.50/GB (guaranteed speed)`,
+        `Tier Rates (duration is always FREE):`,
+        `  shared:  $4.00/GB (shared device, best value)`,
+        `  private: $8.00/GB (exclusive device, guaranteed speed)`,
+        ``,
+        `Min purchase: 0.1 GB ($0.40 shared, $0.80 private)`,
       ].join('\n');
     },
 
@@ -303,7 +318,7 @@ export function createX402ToolHandlers(
         ].join('\n');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        return `Failed to check balance: ${message}`;
+        return toolError('x402_wallet_balance', message, true, 'Check network connection and retry');
       }
     },
 
@@ -352,7 +367,7 @@ export function createX402ToolHandlers(
           .join('\n');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        return `Failed to rotate IP: ${message}`;
+        return toolError('x402_rotate_ip', message, true, 'Wait 5 minutes (cooldown) then retry');
       }
     },
 
@@ -392,7 +407,7 @@ export function createX402ToolHandlers(
         return lines.join('\n');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        return `Failed to list countries: ${message}`;
+        return toolError('x402_list_countries', message, true);
       }
     },
 
@@ -430,7 +445,7 @@ export function createX402ToolHandlers(
         return lines.join('\n');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        return `Failed to list cities: ${message}`;
+        return toolError('x402_list_cities', message, true);
       }
     },
 
@@ -468,7 +483,7 @@ export function createX402ToolHandlers(
         return lines.join('\n');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        return `Failed to list carriers: ${message}`;
+        return toolError('x402_list_carriers', message, true);
       }
     },
 
@@ -510,7 +525,7 @@ export function createX402ToolHandlers(
         ].join('\n');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        return `Failed to extend session: ${message}`;
+        return toolError('x402_extend_session', message, true);
       }
     },
 

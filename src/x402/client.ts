@@ -15,12 +15,11 @@ import type {
 } from './types.js';
 
 /**
- * Pricing rates by tier
+ * Pricing rates by tier - Duration is FREE, pay only for traffic
  */
-const PRICING_RATES: Record<X402Tier, { hourly: number; perGB: number }> = {
-  shared: { hourly: 0.03, perGB: 3.5 },
-  dedicated: { hourly: 0.1, perGB: 3.0 },
-  premium: { hourly: 0.25, perGB: 2.5 },
+const PRICING_RATES: Record<X402Tier, { perGB: number }> = {
+  shared: { perGB: 4.0 },
+  private: { perGB: 8.0 },
 };
 
 /**
@@ -53,19 +52,14 @@ export class X402Client {
     const tier = params.tier || 'shared';
     const rates = PRICING_RATES[tier];
 
-    const timeCost = params.durationHours * rates.hourly;
     const trafficCost = params.trafficGB * rates.perGB;
-    const totalCost = timeCost + trafficCost;
 
     return {
       tier,
-      hourlyRate: rates.hourly,
       trafficRatePerGB: rates.perGB,
-      totalCost,
+      totalCost: trafficCost,
       breakdown: {
-        timeCost,
         trafficCost,
-        durationHours: params.durationHours,
         trafficGB: params.trafficGB,
       },
     };

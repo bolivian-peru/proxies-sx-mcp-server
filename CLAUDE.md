@@ -31,7 +31,7 @@ proxies-sx-mcp/
 │   │   ├── billing.ts        # Purchases API
 │   │   ├── payments.ts       # Crypto payments (CoinGate)
 │   │   └── reference.ts      # Countries/cities/carriers
-│   ├── tools/                # MCP tool definitions (45 tools)
+│   ├── tools/                # MCP tool definitions (48 tools)
 │   │   ├── index.ts          # Tool registry (exports all tools)
 │   │   ├── account.ts        # get_account_summary, get_account_usage
 │   │   ├── ports.ts          # create_port, delete_port, etc.
@@ -125,7 +125,14 @@ Handles USDC transactions on Base network:
 | `/v1/x402/proxy` | GET/POST | Purchase proxy (402 flow) |
 | `/v1/x402/countries` | GET | Available countries |
 | `/v1/x402/calculate` | GET | Calculate cost |
-| `/v1/x402/manage/session` | GET | Session details |
+| `/v1/x402/manage/session` | GET | Session details (X-Session-Token) |
+| `/v1/x402/manage/session/credit` | GET | Check remaining credit |
+| `/v1/x402/manage/ports` | GET | List ports in session |
+| `/v1/x402/manage/ports/:id/status` | GET | Port status |
+| `/v1/x402/manage/ports/recreate` | POST | Recreate deleted port (free) |
+| `/v1/x402/manage/ports/replace` | POST | Replace offline port (free, max 3) |
+| `/v1/x402/manage/session/topup/calculate` | GET | Preview top-up cost |
+| `/v1/x402/manage/session/topup` | POST | Pay to extend session |
 
 **Full API Documentation:** https://proxies.sx/docs
 
@@ -153,16 +160,20 @@ The [x402 protocol](https://x402.org) enables machine-to-machine payments using 
 
 ### Pricing
 
-| Tier | Port/Hour | Traffic/GB | Example (1hr + 1GB) |
-|------|-----------|------------|---------------------|
-| Shared | $0.025 | $3.50 | $3.53 |
-| Private | $0.056 | $3.70 | $3.76 |
+Duration is always FREE — you only pay for traffic.
+
+| Tier | Port Price | Traffic/GB | Min Purchase |
+|------|-----------|------------|-------------|
+| Shared | FREE | $4.00 | 0.1 GB ($0.40) |
+| Private | FREE | $8.00 | 0.1 GB ($0.80) |
+
+Available countries: DE, PL, US, FR, ES, GB
 
 ---
 
-## Tools (56 Total)
+## Tools (59 Total)
 
-### API Key Mode (45 Tools)
+### API Key Mode (48 Tools)
 
 **Account Tools:**
 - `get_account_summary` - Balance, slots, traffic usage
@@ -220,12 +231,15 @@ The [x402 protocol](https://x402.org) enables machine-to-machine payments using 
 - `reply_to_ticket` - Reply
 - `close_ticket` - Close ticket
 
-**x402 Session Management (5 tools):**
+**x402 Session Management (8 tools):**
 - `get_x402_session` - Session details
 - `list_x402_ports` - Ports in session
 - `get_x402_port_status` - Port status
 - `get_sessions_by_wallet` - Sessions by wallet
 - `get_session_status` - Quick status
+- `replace_x402_port` - Replace offline port (free, max 3)
+- `calculate_x402_topup` - Preview top-up cost
+- `topup_x402_session` - Pay to extend session
 
 ### x402 Mode (11 Tools)
 
@@ -336,4 +350,4 @@ async function handleMyNewTool(args: any) {
 
 ---
 
-**Last Updated:** 2026-01-01
+**Last Updated:** 2026-02-04

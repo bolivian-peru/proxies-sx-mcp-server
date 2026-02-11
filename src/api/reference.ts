@@ -1,10 +1,13 @@
 /**
  * Reference Data API Module
- * Endpoints for countries, carriers, cities, and regions
+ * Endpoints for countries (dynamic availability)
+ *
+ * NOTE: Cities, regions, and carriers endpoints were removed.
+ * Real device availability is fetched dynamically at port creation time.
  */
 
 import type { ApiClient } from './client.js';
-import type { Country, City, Carrier, Region, PaginatedResponse } from './types.js';
+import type { Country, PaginatedResponse } from './types.js';
 
 export class ReferenceApi {
   constructor(private readonly client: ApiClient) {}
@@ -33,53 +36,5 @@ export class ReferenceApi {
    */
   async getCountry(countryId: string): Promise<Country> {
     return this.client.get<Country>(`/v1/countries/${countryId}`);
-  }
-
-  /**
-   * Get carriers for a country (with available device count)
-   */
-  async getCarriers(countryId: string, isPrivate: boolean = false): Promise<(Carrier & { freeDeviceCount?: number })[]> {
-    return this.client.get<(Carrier & { freeDeviceCount?: number })[]>(
-      `/v1/carriers/country/${countryId}`,
-      { withDevice: 'true', isPrivate: isPrivate.toString() }
-    );
-  }
-
-  /**
-   * Get cities for a country (with available device count)
-   */
-  async getCities(countryId: string, isPrivate: boolean = false): Promise<(City & { freeDeviceCount?: number })[]> {
-    return this.client.get<(City & { freeDeviceCount?: number })[]>(
-      `/v1/cities/country/${countryId}`,
-      { withDevice: 'true', isPrivate: isPrivate.toString() }
-    );
-  }
-
-  /**
-   * Get regions for a country
-   */
-  async getRegions(countryId: string): Promise<Region[]> {
-    return this.client.get<Region[]>(`/v1/regions/country/${countryId}`);
-  }
-
-  /**
-   * Get carrier by ID
-   */
-  async getCarrier(carrierId: string): Promise<Carrier> {
-    return this.client.get<Carrier>(`/v1/carriers/${carrierId}`);
-  }
-
-  /**
-   * Get city by ID
-   */
-  async getCity(cityId: string): Promise<City> {
-    return this.client.get<City>(`/v1/cities/${cityId}`);
-  }
-
-  /**
-   * Get region by ID
-   */
-  async getRegion(regionId: string): Promise<Region> {
-    return this.client.get<Region>(`/v1/regions/${regionId}`);
   }
 }
