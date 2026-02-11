@@ -37,7 +37,7 @@ proxies-sx-mcp/
 │   │   ├── ports.ts          # create_port, delete_port, etc.
 │   │   ├── status.ts         # get_port_status, ping_port, etc.
 │   │   ├── rotation.ts       # rotate_port, configure_auto_rotation
-│   │   ├── billing.ts        # purchase_shared_slots, etc.
+│   │   ├── billing.ts        # purchase_shared_traffic, etc.
 │   │   ├── reference.ts      # list_available_countries, etc.
 │   │   ├── utilities.ts      # get_proxy_connection_string, etc.
 │   │   ├── payments.ts       # create_crypto_payment, etc.
@@ -171,9 +171,9 @@ Available countries: DE, PL, US, FR, ES, GB
 
 ---
 
-## Tools (59 Total)
+## Tools (57 Total)
 
-### API Key Mode (48 Tools)
+### API Key Mode (46 Tools)
 
 **Account Tools:**
 - `get_account_summary` - Balance, slots, traffic usage
@@ -201,10 +201,10 @@ Available countries: DE, PL, US, FR, ES, GB
 - `get_rotation_history` - View history
 - `get_rotation_token_url` - Public rotation URL
 
-**Billing Tools (5 tools):**
+**Billing Tools (3 tools):**
 - `get_pricing` - Current pricing
-- `purchase_shared_slots` / `purchase_shared_traffic`
-- `purchase_private_slots` / `purchase_private_traffic`
+- `purchase_shared_traffic` - Buy shared GB ($4/GB, auto-upgrades slot tier)
+- `purchase_private_traffic` - Buy private GB ($8/GB, auto-upgrades slot tier)
 
 **Crypto Payment Tools (5 tools):**
 - `create_crypto_payment` - Create CoinGate order

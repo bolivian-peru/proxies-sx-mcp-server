@@ -107,7 +107,7 @@ After installing, verify the package works:
 # Check version
 npm list @proxies-sx/mcp-server
 
-# Test loading (should show "59 tools available")
+# Test loading (should show "57 tools available")
 node -e "const t = require('@proxies-sx/mcp-server/dist/tools'); console.log(t.allToolDefinitions.length + ' tools available')"
 ```
 
@@ -309,11 +309,9 @@ Available countries: **DE, PL, US, FR, ES, GB** (dynamic based on device availab
 
 | Tool | Description |
 |------|-------------|
-| `get_pricing` | Get current pricing |
-| `purchase_shared_slots` | Buy shared port slots |
-| `purchase_shared_traffic` | Buy shared traffic (GB) |
-| `purchase_private_slots` | Buy private port slots |
-| `purchase_private_traffic` | Buy private traffic (GB) |
+| `get_pricing` | Get current pricing with volume discounts and slot tiers |
+| `purchase_shared_traffic` | Buy shared traffic in GB ($4/GB base). Auto-upgrades slot tier! |
+| `purchase_private_traffic` | Buy private traffic in GB ($8/GB base). Auto-upgrades slot tier! |
 
 ### Crypto Payment Tools
 
@@ -690,7 +688,7 @@ npm list @proxies-sx/mcp-server
 # Verify package loads correctly
 node -e "require('@proxies-sx/mcp-server/dist/tools')" && echo "OK"
 
-# Check tool count (should be 59)
+# Check tool count (should be 57)
 node -e "console.log(require('@proxies-sx/mcp-server/dist/tools').allToolDefinitions.length)"
 ```
 
