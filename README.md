@@ -107,7 +107,7 @@ After installing, verify the package works:
 # Check version
 npm list @proxies-sx/mcp-server
 
-# Test loading (should show "57 tools available")
+# Test loading (should show "55 tools available")
 node -e "const t = require('@proxies-sx/mcp-server/dist/tools'); console.log(t.allToolDefinitions.length + ' tools available')"
 ```
 
@@ -310,6 +310,7 @@ Available countries: **DE, PL, US, FR, ES, GB** (dynamic based on device availab
 | Tool | Description |
 |------|-------------|
 | `get_pricing` | Get current pricing with volume discounts and slot tiers |
+| `calculate_price` | Calculate price for a specific GB amount with volume discounts |
 | `purchase_shared_traffic` | Buy shared traffic in GB ($4/GB base). Auto-upgrades slot tier! |
 | `purchase_private_traffic` | Buy private traffic in GB ($8/GB base). Auto-upgrades slot tier! |
 
@@ -329,10 +330,7 @@ Supported: BTC, ETH, USDT, USDC, LTC, DOGE, TRX, XRP, ADA, SOL, MATIC, AVAX, DOT
 
 | Tool | Description |
 |------|-------------|
-| `list_available_countries` | List available countries |
-| `list_carriers_for_country` | List carriers in a country |
-| `list_cities_for_country` | List cities in a country |
-| `list_regions_for_country` | List regions in a country |
+| `list_available_countries` | List available countries with live device counts |
 
 ### Utility Tools
 
@@ -688,7 +686,7 @@ npm list @proxies-sx/mcp-server
 # Verify package loads correctly
 node -e "require('@proxies-sx/mcp-server/dist/tools')" && echo "OK"
 
-# Check tool count (should be 57)
+# Check tool count (should be 55)
 node -e "console.log(require('@proxies-sx/mcp-server/dist/tools').allToolDefinitions.length)"
 ```
 

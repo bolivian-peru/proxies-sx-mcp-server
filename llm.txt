@@ -66,31 +66,33 @@ npx @proxies-sx/mcp-server
 - `get_rotation_token_url` - Get public rotation URL
 
 ### Billing & Purchases
-- `get_pricing` - Current pricing tiers
-- `purchase_shared_slots` - Buy shared port slots
-- `purchase_shared_traffic` - Buy shared traffic (GB)
-- `purchase_private_slots` - Buy private port slots
-- `purchase_private_traffic` - Buy private traffic (GB)
+- `get_pricing` - Current pricing tiers and volume discounts
+- `calculate_price` - Calculate price with volume discounts for a specific GB amount
+- `purchase_shared_traffic` - Buy shared traffic in GB ($4/GB base)
+- `purchase_private_traffic` - Buy private traffic in GB ($8/GB base)
 
 ### Crypto Payments
 - `create_crypto_payment` - Create CoinGate order ($10-$1000)
 - `check_crypto_payment_status` - Check payment status
 - `get_pending_crypto_payments` - List pending payments
+- `cancel_crypto_payment` - Cancel a pending payment
+- `get_crypto_payment_info` - Supported currencies and info
 - Supports: BTC, ETH, USDT, USDC, LTC, DOGE, and 50+ more
 
 ### Reference Data
-- `list_available_countries` - Available countries
-- `list_carriers_for_country` - Carriers by country
-- `list_cities_for_country` - Cities by country
-- `list_regions_for_country` - Regions by country
+- `list_available_countries` - Available countries with live device counts
 
 ### x402 Tools (Autonomous Mode)
 - `x402_get_proxy` - Purchase proxy with USDC
 - `x402_get_pricing` - Calculate cost
 - `x402_wallet_balance` - Check wallet balance
 - `x402_list_sessions` - List active sessions
+- `x402_check_session` - Session details
 - `x402_rotate_ip` - Rotate IP
 - `x402_list_countries` - Available countries
+- `x402_list_cities` - Cities in a country
+- `x402_list_carriers` - Carriers in a country
+- `x402_extend_session` - Add more traffic/time
 - `x402_service_status` - Health check
 
 ### x402 Session Management
@@ -108,6 +110,7 @@ npx @proxies-sx/mcp-server
 - `list_my_tickets` - List tickets
 - `get_ticket` - Get ticket details
 - `reply_to_ticket` - Reply to ticket
+- `close_ticket` - Close a resolved ticket
 
 ## Pricing
 
