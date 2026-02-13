@@ -171,9 +171,9 @@ Available countries: DE, PL, US, FR, ES, GB
 
 ---
 
-## Tools (57 Total)
+## Tools (55 Total)
 
-### API Key Mode (46 Tools)
+### API Key Mode (44 Tools)
 
 **Account Tools:**
 - `get_account_summary` - Balance, slots, traffic usage
@@ -201,8 +201,9 @@ Available countries: DE, PL, US, FR, ES, GB
 - `get_rotation_history` - View history
 - `get_rotation_token_url` - Public rotation URL
 
-**Billing Tools (3 tools):**
+**Billing Tools (4 tools):**
 - `get_pricing` - Current pricing
+- `calculate_price` - Calculate price with volume discounts
 - `purchase_shared_traffic` - Buy shared GB ($4/GB, auto-upgrades slot tier)
 - `purchase_private_traffic` - Buy private GB ($8/GB, auto-upgrades slot tier)
 
@@ -213,11 +214,8 @@ Available countries: DE, PL, US, FR, ES, GB
 - `cancel_crypto_payment` - Cancel payment
 - `get_crypto_payment_info` - Supported currencies
 
-**Reference Tools (4 tools):**
-- `list_available_countries` - Available countries
-- `list_carriers_for_country` - Carriers by country
-- `list_cities_for_country` - Cities by country
-- `list_regions_for_country` - Regions by country
+**Reference Tools (1 tool):**
+- `list_available_countries` - Available countries (cities/carriers/regions removed Jan 2026)
 
 **Utility Tools (3 tools):**
 - `get_proxy_connection_string` - Generate connection string
