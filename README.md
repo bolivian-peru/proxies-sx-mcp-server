@@ -71,7 +71,7 @@ npx proxies-sx-mcp
 ### Option 4: From Source
 
 ```bash
-git clone https://github.com/proxies-sx/mcp-server.git
+git clone https://github.com/bolivian-peru/proxies-sx-mcp-server.git
 cd mcp-server
 npm install
 npm run build
