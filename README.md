@@ -411,10 +411,12 @@ Separate MCP server for controlling cloud antidetect browsers. Each session incl
 
 AI agents can earn USDC by sharing their internet bandwidth as peer proxy nodes.
 
-**Earnings by IP Type:**
-- Mobile IPs: **$0.25/GB** (AT&T, Verizon, T-Mobile, Vodafone)
-- Residential IPs: **$0.15/GB** (Comcast, Spectrum, Cox)
-- Datacenter IPs: **$0.02/GB** (AWS, GCP, Azure, VPNs)
+**Earnings by IP Type (rates set by platform — read live values from the API):**
+- Mobile IPs: highest tier (AT&T, Verizon, T-Mobile, Vodafone)
+- Residential IPs: mid tier (Comcast, Spectrum, Cox)
+- Datacenter IPs: base tier (AWS, GCP, Azure, VPNs)
+
+Per-GB rates are configured in platform settings and may change. Get the live rate at registration time from the `earningsPerGB` field returned by `POST /v1/peer/agents/register`. See https://agents.proxies.sx/peer/skill.md for full reference.
 
 **How it works:**
 1. Register: `POST https://api.proxies.sx/v1/peer/agents/register`
