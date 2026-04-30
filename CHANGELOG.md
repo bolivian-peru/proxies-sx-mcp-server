@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.1 (2026-04-30)
+
+### Docs
+- Added `SKILL.md` in [Anthropic skill format](https://github.com/anthropics/skills) — drops directly into Claude Code, Cursor, Windsurf, etc. as a triggerable skill that produces correct setup configs and tool selection for any user intent
+- README: removed specific peer rate dollar amounts (rates are platform-configurable, fetch live values from `get_pricing` / `x402_get_pricing` tools)
+- GitHub repo metadata set: description, homepage, topics
+
+
 ## 2.0.0 (2026-02-08)
 
 ### Breaking
