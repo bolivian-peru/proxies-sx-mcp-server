@@ -5,10 +5,10 @@ description: Manage Proxies.sx mobile/residential proxies, mint x402 USDC sessio
 
 # Proxies.sx MCP Server
 
-Open-source [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 55 typed tools to any MCP-compatible AI agent. Two operating modes:
+Open-source [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 61 typed tools to any MCP-compatible AI agent. Two operating modes:
 
 - **API Key mode** — agent acts on behalf of a logged-in Proxies.sx user (44 tools: ports, rotation, billing, payments, support, etc.)
-- **x402 Autonomous mode** — agent pays for its own proxies with USDC on Base or Solana, no human account needed (11 tools: `x402_get_proxy`, `x402_rotate_ip`, `x402_extend_session`, …)
+- **x402 Autonomous mode** — agent pays for its own proxies with USDC on Base or Solana, no human account needed (17 tools: `x402_get_proxy`, `x402_rotate_ip`, `x402_get_pool_access`, …)
 
 Source: <https://github.com/bolivian-peru/proxies-sx-mcp-server> · npm: [`@proxies-sx/mcp-server`](https://www.npmjs.com/package/@proxies-sx/mcp-server) · License: MIT.
 
@@ -44,13 +44,14 @@ Use when the user already has a Proxies.sx account and wants their agent to mana
 - Auth: `PROXIES_API_KEY=psx_...` env var (mint at [client.proxies.sx/account](https://client.proxies.sx/account))
 - Cost: pays from the user's existing account balance
 
-### Mode B — x402 Autonomous (11 tools, no account needed)
+### Mode B — x402 Autonomous (17 tools, no account needed)
 
 Use when the user is building an **autonomous agent** that should pay for its own bandwidth without human intervention.
 
-- Tools: `x402_get_proxy`, `x402_get_pricing`, `x402_wallet_balance`, `x402_rotate_ip`, `x402_extend_session`, `x402_list_sessions`, `x402_check_session`, `x402_list_countries`, `x402_list_cities`, `x402_list_carriers`, `x402_service_status`
+- Dedicated-proxy tools: `x402_get_proxy`, `x402_get_pricing`, `x402_wallet_balance`, `x402_rotate_ip`, `x402_list_sessions`, `x402_check_session`, `x402_list_countries`, `x402_list_cities`, `x402_list_carriers`, `x402_service_status`
+- Pool Gateway tools: `x402_get_pool_access`, `x402_pool_credit`, `x402_pool_topup`, `x402_pool_regenerate`, `x402_pool_connection`, `x402_pool_pricing`, `get_pool_stock`
 - Auth: `AGENT_WALLET_KEY=<base58 Solana key | hex EVM key>` env var
-- Cost: USDC paid per request from the agent's own wallet (Solana ~$0.0001 gas, Base ~$0.01 gas)
+- Cost: USDC paid per request from the agent's own wallet (Solana ~$0.0001 gas, Base ~$0.01 gas). $4/GB, metered.
 
 ### Mode C — Both at once
 
@@ -132,13 +133,13 @@ npx -y @proxies-sx/mcp-server --help
 # Should print version + usage.
 ```
 
-If your MCP client has a "Tools" panel, you should see ~55 tools prefixed `proxies-sx`. If you see 0, the env vars are missing or the binary failed to download — check the client's MCP error log.
+If your MCP client has a "Tools" panel, you should see ~61 tools prefixed `proxies-sx`. If you see 0, the env vars are missing or the binary failed to download — check the client's MCP error log.
 
 ---
 
 ## Tool catalog
 
-55 tools organized by category. Use the table to pick the right tool for the user's intent.
+61 tools organized by category. Use the table to pick the right tool for the user's intent.
 
 ### API Key mode (44 tools)
 
@@ -148,28 +149,45 @@ If your MCP client has a "Tools" panel, you should see ~55 tools prefixed `proxi
 | Port management | 7 | `list_ports`, `create_port`, `delete_port`, `update_port_credentials`, `update_os_fingerprint`, `reconfigure_port`, `get_port` |
 | Port status | 4 | `get_port_status`, `get_port_ip`, `ping_port`, `speed_test_port` |
 | Rotation | 5 | `rotate_port`, `check_rotation_availability`, `configure_auto_rotation`, `get_rotation_history`, `get_rotation_token_url` |
-| Billing | 4 | `get_pricing`, `calculate_price`, `purchase_shared_traffic`, `purchase_private_traffic` |
+| Billing | 4 | `get_pricing` ($4/GB metered), `calculate_price`, `purchase_shared_traffic`, `purchase_private_traffic` (legacy; metered $4/GB) |
 | Crypto payments | 5 | `create_crypto_payment`, `check_crypto_payment_status`, `get_pending_crypto_payments`, `cancel_crypto_payment`, `get_crypto_payment_info` |
 | Reference | 1 | `list_available_countries` |
 | Utilities | 3 | `get_proxy_connection_string`, `get_all_proxy_formats`, `get_os_fingerprint_options` |
 | Support | 5 | `create_support_ticket`, `list_my_tickets`, `get_ticket`, `reply_to_ticket`, `close_ticket` |
 | x402 session mgmt | 8 | `get_x402_session`, `list_x402_ports`, `get_x402_port_status`, `get_sessions_by_wallet`, `get_session_status`, `replace_x402_port`, `calculate_x402_topup`, `topup_x402_session` |
 
-### x402 Autonomous mode (11 tools)
+### x402 Autonomous mode (17 tools)
+
+**Dedicated proxy (10 tools)**
 
 | Tool | What it does |
 |---|---|
-| `x402_get_proxy` | Buy a proxy with USDC. Pays on-chain, returns credentials. |
-| `x402_get_pricing` | Get current pricing tiers. |
+| `x402_get_proxy` | Buy a dedicated proxy with USDC ($4/GB, metered). Pays on-chain, returns credentials. |
+| `x402_get_pricing` | Get current pricing ($4/GB, metered). |
 | `x402_wallet_balance` | Check the agent's USDC balance on Base + Solana. |
 | `x402_list_sessions` | List the agent's active sessions. |
 | `x402_check_session` | Status of a specific session by token. |
 | `x402_rotate_ip` | Rotate the IP for a session (free). |
-| `x402_extend_session` | Pay USDC to add traffic / duration. |
 | `x402_list_countries` | Available countries with live device counts. |
 | `x402_list_cities` | Cities in a country. |
 | `x402_list_carriers` | Mobile carriers in a country. |
 | `x402_service_status` | Health check for the x402 service. |
+
+(To extend a dedicated-port session, use `calculate_x402_topup` / `topup_x402_session` from the session-management group.)
+
+**Pool Gateway access (7 tools)** — one credential reaches every country in your tier via the username DSL. v1 tier = `mbl` ($4/GB, production modems, HTTP :7000).
+
+| Tool | What it does |
+|---|---|
+| `x402_get_pool_access` | Buy Pool Gateway access with USDC. Returns one DSL credential + caches the session token. |
+| `x402_pool_credit` | Remaining GB for a pool session (cached token if omitted). |
+| `x402_pool_topup` | Pay USDC for more GB (duration-only is free). |
+| `x402_pool_regenerate` | Rotate the credential secret (same username, new password). |
+| `x402_pool_connection` | Re-emit credentials (recovery). |
+| `x402_pool_pricing` | Tier catalog + username DSL (no auth needed). |
+| `get_pool_stock` | Public online endpoint counts per country (no IPs). |
+
+> Pool quality copy: `mbl` is the production tier. **Sticky pins the modem, not the IP** — carrier NAT may still re-issue the egress IP. Never claim peer reliability.
 
 ---
 
@@ -183,7 +201,18 @@ Generate code that matches the user's intent. Here are the recipes most users wa
 1. Tool: x402_get_proxy with country="us", traffic=1, tier="shared"
 2. Save the returned sessionToken (x402s_...) and proxy credentials
 3. Use the proxy in any HTTP client
-4. When done, optional: x402_extend_session if needs more traffic
+4. When done, optional: calculate_x402_topup + topup_x402_session to add traffic
+```
+
+### "Buy pool access, one credential for every country" (x402 mode)
+
+```
+1. Tool: x402_pool_pricing — see the tier catalog + username DSL (no wallet needed)
+2. Tool: get_pool_stock — check which countries currently have capacity
+3. Tool: x402_get_pool_access with traffic_gb=5 (tier defaults to mbl)
+4. Use the returned credential, switching country via the username DSL:
+   psx_xxx-mbl-us, psx_xxx-mbl-de, ... (HTTP proxy on port 7000)
+5. Tool: x402_pool_credit — check remaining GB; x402_pool_topup to add more
 ```
 
 ### "Manage my account's proxies" (API key mode)
@@ -201,7 +230,7 @@ Generate code that matches the user's intent. Here are the recipes most users wa
 ```
 1. Tool: x402_check_session with sessionToken — see remaining traffic + duration
 2. Tool: calculate_x402_topup with addTrafficGB=2 — preview cost
-3. Tool: x402_extend_session with addTrafficGB=2 — pay USDC and extend
+3. Tool: topup_x402_session with addTrafficGB=2 + paymentSignature — pay USDC and extend
 ```
 
 ### "Replace an offline port for free" (x402 mode)

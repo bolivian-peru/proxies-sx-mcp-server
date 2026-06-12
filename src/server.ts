@@ -140,8 +140,15 @@ export async function createMcpServer(config: McpServerConfig) {
       x402_list_countries: () => x402Handlers.x402_list_countries(),
       x402_list_cities: (args) => x402Handlers.x402_list_cities(args as Parameters<typeof x402Handlers.x402_list_cities>[0]),
       x402_list_carriers: (args) => x402Handlers.x402_list_carriers(args as Parameters<typeof x402Handlers.x402_list_carriers>[0]),
-      x402_extend_session: (args) => x402Handlers.x402_extend_session(args as Parameters<typeof x402Handlers.x402_extend_session>[0]),
       x402_service_status: () => x402Handlers.x402_service_status(),
+      // Pool Gateway Access
+      x402_get_pool_access: (args) => x402Handlers.x402_get_pool_access(args as Parameters<typeof x402Handlers.x402_get_pool_access>[0]),
+      x402_pool_credit: (args) => x402Handlers.x402_pool_credit(args as Parameters<typeof x402Handlers.x402_pool_credit>[0]),
+      x402_pool_topup: (args) => x402Handlers.x402_pool_topup(args as Parameters<typeof x402Handlers.x402_pool_topup>[0]),
+      x402_pool_regenerate: (args) => x402Handlers.x402_pool_regenerate(args as Parameters<typeof x402Handlers.x402_pool_regenerate>[0]),
+      x402_pool_connection: (args) => x402Handlers.x402_pool_connection(args as Parameters<typeof x402Handlers.x402_pool_connection>[0]),
+      x402_pool_pricing: () => x402Handlers.x402_pool_pricing(),
+      get_pool_stock: () => x402Handlers.get_pool_stock(),
     };
 
     // Add x402 tool definitions
@@ -156,7 +163,7 @@ export async function createMcpServer(config: McpServerConfig) {
   const server = new Server(
     {
       name: 'proxies-sx-mcp',
-      version: '2.0.0',
+      version: '2.1.0',
     },
     {
       capabilities: {

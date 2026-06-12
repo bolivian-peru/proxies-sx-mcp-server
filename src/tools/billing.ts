@@ -2,9 +2,10 @@
  * Billing Tools
  * MCP tools for purchases and pricing
  *
- * BUSINESS MODEL UPDATE (Jan 2026):
+ * BUSINESS MODEL UPDATE (2026):
  * - Slots are now FREE, unlocked by tier based on cumulative GB purchases
- * - Base prices: $4/GB shared, $8/GB private
+ * - Per-GB metered only: $4/GB (the legacy private/dedicated tier was removed)
+ * - Live values always come from the API (get_pricing reads basePrices)
  * - Volume discounts: 10% at 25GB, 20% at 50GB, 30% at 100GB, 40% at 250GB
  * - Tiers: Starter (5+1 slots), Bronze (10+2), Silver (20+4), Gold (35+7), Platinum (50+10), Enterprise (80+15)
  */
@@ -19,7 +20,7 @@ import { formatCurrency, formatGB } from '../utils/formatting.js';
 export const billingToolDefinitions = [
   {
     name: 'get_pricing',
-    description: 'Get current pricing including base prices ($4/GB shared, $8/GB private), volume discounts (10-40%), slot tiers, and your current tier progression. Slots are FREE and unlock based on cumulative GB purchases.',
+    description: 'Get current pricing: per-GB metered at $4/GB (live values returned from the API), volume discounts (10-40%), slot tiers, and your current tier progression. Slots are FREE and unlock based on cumulative GB purchases.',
     inputSchema: {
       type: 'object' as const,
       properties: {},
@@ -38,7 +39,7 @@ export const billingToolDefinitions = [
         },
         isPrivate: {
           type: 'boolean',
-          description: 'true for private traffic ($8/GB base), false for shared ($4/GB base)',
+          description: 'Legacy flag still accepted by the API. The platform is per-GB metered only at $4/GB now; leave false. Live price is computed server-side.',
         },
       },
       required: ['amount'],

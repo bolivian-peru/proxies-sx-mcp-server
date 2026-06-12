@@ -31,7 +31,7 @@ proxies-sx-mcp/
 │   │   ├── billing.ts        # Purchases API
 │   │   ├── payments.ts       # Crypto payments (CoinGate)
 │   │   └── reference.ts      # Countries/cities/carriers
-│   ├── tools/                # MCP tool definitions (48 tools)
+│   ├── tools/                # MCP tool definitions (44 API-key tools)
 │   │   ├── index.ts          # Tool registry (exports all tools)
 │   │   ├── account.ts        # get_account_summary, get_account_usage
 │   │   ├── ports.ts          # create_port, delete_port, etc.
@@ -43,7 +43,7 @@ proxies-sx-mcp/
 │   │   ├── payments.ts       # create_crypto_payment, etc.
 │   │   ├── support.ts        # create_support_ticket, etc.
 │   │   └── x402-session.ts   # get_x402_session, list_x402_ports
-│   ├── x402/                 # x402 Protocol - autonomous payments (11 tools)
+│   ├── x402/                 # x402 Protocol - autonomous payments (17 tools, incl. Pool Gateway)
 │   │   ├── index.ts          # x402 module setup
 │   │   ├── client.ts         # x402 HTTP client (402 flow)
 │   │   ├── wallet.ts         # USDC wallet & transaction signing
@@ -160,18 +160,22 @@ The [x402 protocol](https://x402.org) enables machine-to-machine payments using 
 
 ### Pricing
 
-Duration is always FREE — you only pay for traffic.
+Duration is always FREE — you only pay for traffic. Per-GB metered only ($4/GB);
+the legacy private/dedicated ($8/GB) tier was removed.
 
 | Tier | Port Price | Traffic/GB | Min Purchase |
 |------|-----------|------------|-------------|
-| Shared | FREE | $4.00 | 0.1 GB ($0.40) |
-| Private | FREE | $8.00 | 0.1 GB ($0.80) |
+| Metered (shared) | FREE | $4.00 | 0.1 GB ($0.40) |
+
+**Pool Gateway access (x402):** tier `mbl` at $4.00/GB — one credential reaches every
+country in your tier via the username DSL (HTTP proxy on port 7000). Buy with
+`x402_get_pool_access`; catalog at `GET /v1/x402/pool/pricing`.
 
 Available countries: DE, PL, US, FR, ES, GB
 
 ---
 
-## Tools (55 Total)
+## Tools (61 Total)
 
 ### API Key Mode (44 Tools)
 
@@ -202,10 +206,10 @@ Available countries: DE, PL, US, FR, ES, GB
 - `get_rotation_token_url` - Public rotation URL
 
 **Billing Tools (4 tools):**
-- `get_pricing` - Current pricing
+- `get_pricing` - Current pricing ($4/GB, metered; live values from API)
 - `calculate_price` - Calculate price with volume discounts
-- `purchase_shared_traffic` - Buy shared GB ($4/GB, auto-upgrades slot tier)
-- `purchase_private_traffic` - Buy private GB ($8/GB, auto-upgrades slot tier)
+- `purchase_shared_traffic` - Buy GB ($4/GB, auto-upgrades slot tier)
+- `purchase_private_traffic` - Legacy buy-GB tool (still accepted by the API; metered $4/GB)
 
 **Crypto Payment Tools (5 tools):**
 - `create_crypto_payment` - Create CoinGate order
@@ -239,19 +243,33 @@ Available countries: DE, PL, US, FR, ES, GB
 - `calculate_x402_topup` - Preview top-up cost
 - `topup_x402_session` - Pay to extend session
 
-### x402 Mode (11 Tools)
+### x402 Mode (17 Tools)
 
-- `x402_get_proxy` - Purchase proxy with USDC
+**Dedicated proxy (10 tools):**
+- `x402_get_proxy` - Purchase a dedicated proxy with USDC ($4/GB, metered)
 - `x402_get_pricing` - Calculate cost
 - `x402_wallet_balance` - Check wallet balance
 - `x402_list_sessions` - List active sessions
 - `x402_check_session` - Session details
 - `x402_rotate_ip` - Rotate IP
-- `x402_extend_session` - Add more time
 - `x402_list_countries` - Available countries
 - `x402_list_cities` - Cities in country
 - `x402_list_carriers` - Carriers in country
 - `x402_service_status` - Health check
+
+(To extend a dedicated-port session use `calculate_x402_topup` / `topup_x402_session`.
+`x402_extend_session` was removed in 2.1.0 — it called a non-existent route and
+duplicated `topup_x402_session`.)
+
+**Pool Gateway access (7 tools)** — one credential reaches every country in your tier
+via the username DSL. v1 tier = `mbl` ($4/GB, production modems, HTTP :7000):
+- `x402_get_pool_access` - Buy Pool Gateway access with USDC (caches session token)
+- `x402_pool_credit` - Remaining GB on the pool session
+- `x402_pool_topup` - Pay USDC for more GB (duration-only is free)
+- `x402_pool_regenerate` - Rotate the credential secret (same username)
+- `x402_pool_connection` - Re-emit credentials (recovery)
+- `x402_pool_pricing` - Tier catalog + username DSL (no auth)
+- `get_pool_stock` - Public online endpoint counts per country (no IPs)
 
 ---
 

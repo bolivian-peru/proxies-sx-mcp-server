@@ -187,3 +187,64 @@ export interface X402Pricing {
     trafficGB: number;
   };
 }
+
+/**
+ * Pool Gateway proxy block returned after purchase
+ */
+export interface X402PoolProxy {
+  host: string;
+  httpPort: number;
+  username: string;
+  password: string;
+  http?: string;
+  usernameTemplate?: string;
+  allowed?: string[];
+}
+
+/**
+ * Pool Gateway credit (pak-backed)
+ */
+export interface X402PoolCredit {
+  tier?: string;
+  allocatedGB: number;
+  usedGB: number;
+  remainingGB: number;
+  enabled: boolean;
+  expiresAt?: string;
+}
+
+/**
+ * Pool Gateway purchase response
+ */
+export interface X402PoolResponse {
+  product: 'pool';
+  proxy: X402PoolProxy;
+  credit: X402PoolCredit;
+  sessionToken: string;
+  manage?: Record<string, string>;
+  quality?: string;
+  caveats?: string[];
+  payment?: {
+    network: X402Network;
+    transactionHash?: string;
+    amountUSDC?: string | number;
+  };
+}
+
+/**
+ * Pool Gateway tier catalog (no auth)
+ */
+export interface X402PoolPricing {
+  product: 'pool';
+  tiers: Array<{
+    tier: string;
+    pricePerGB: number;
+    minPurchaseGB?: number;
+    quality?: string;
+    [key: string]: unknown;
+  }>;
+  defaultTier?: string;
+  stockUrl?: string;
+  usernameDsl?: string;
+  networks?: unknown[];
+}

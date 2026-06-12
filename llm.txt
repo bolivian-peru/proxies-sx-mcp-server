@@ -37,7 +37,7 @@ npx @proxies-sx/mcp-server
 - Agents pay directly with crypto - no signup required
 - Uses HTTP 402 Payment Required protocol
 
-## Available Tools (55 Total)
+## Available Tools (61 Total)
 
 ### Account Management
 - `get_account_summary` - Balance, slots, traffic usage
@@ -66,10 +66,10 @@ npx @proxies-sx/mcp-server
 - `get_rotation_token_url` - Get public rotation URL
 
 ### Billing & Purchases
-- `get_pricing` - Current pricing tiers and volume discounts
+- `get_pricing` - Current pricing ($4/GB, metered) and volume discounts
 - `calculate_price` - Calculate price with volume discounts for a specific GB amount
-- `purchase_shared_traffic` - Buy shared traffic in GB ($4/GB base)
-- `purchase_private_traffic` - Buy private traffic in GB ($8/GB base)
+- `purchase_shared_traffic` - Buy traffic in GB ($4/GB, metered)
+- `purchase_private_traffic` - Legacy buy-GB tool (still accepted by the API; metered $4/GB)
 
 ### Crypto Payments
 - `create_crypto_payment` - Create CoinGate order ($10-$1000)
@@ -83,7 +83,7 @@ npx @proxies-sx/mcp-server
 - `list_available_countries` - Available countries with live device counts
 
 ### x402 Tools (Autonomous Mode)
-- `x402_get_proxy` - Purchase proxy with USDC
+- `x402_get_proxy` - Purchase a dedicated proxy with USDC ($4/GB, metered)
 - `x402_get_pricing` - Calculate cost
 - `x402_wallet_balance` - Check wallet balance
 - `x402_list_sessions` - List active sessions
@@ -92,8 +92,18 @@ npx @proxies-sx/mcp-server
 - `x402_list_countries` - Available countries
 - `x402_list_cities` - Cities in a country
 - `x402_list_carriers` - Carriers in a country
-- `x402_extend_session` - Add more traffic/time
 - `x402_service_status` - Health check
+(To extend a dedicated-port session use `calculate_x402_topup` / `topup_x402_session`.)
+
+### x402 Pool Gateway Access (Autonomous Mode)
+One credential reaches every country in your tier via the username DSL. v1 tier = `mbl` ($4/GB, production modems, HTTP port 7000).
+- `x402_get_pool_access` - Buy Pool Gateway access with USDC (caches the session token)
+- `x402_pool_credit` - Remaining GB on the pool session (cached token if omitted)
+- `x402_pool_topup` - Pay USDC for more GB (duration-only is free)
+- `x402_pool_regenerate` - Rotate the credential secret (same username, new password)
+- `x402_pool_connection` - Re-emit credentials (recovery)
+- `x402_pool_pricing` - Tier catalog + username DSL (no auth)
+- `get_pool_stock` - Public online endpoint counts per country (no IPs)
 
 ### x402 Session Management
 - `get_x402_session` - Session details by token
@@ -114,16 +124,17 @@ npx @proxies-sx/mcp-server
 
 ## Pricing
 
-Duration is always FREE — you only pay for traffic.
+Duration is always FREE — you only pay for traffic. Per-GB metered only.
 
-### Shared
+### Metered
 - Traffic: $4.00/GB
 - Min purchase: 0.1 GB ($0.40)
+- The legacy private/dedicated ($8/GB) tier was removed; the platform is metered-only now.
 
-### Private
-- Traffic: $8.00/GB
-- Min purchase: 0.1 GB ($0.80)
-- Dedicated modem, exclusive access
+### Pool Gateway access (x402)
+- Tier `mbl`: $4.00/GB, production ProxySmart modems, HTTP proxy on port 7000
+- One credential reaches every country in your tier via the username DSL (psx_xxx-mbl-us, -mbl-de, ...)
+- Buy with `x402_get_pool_access`; catalog via `GET /v1/x402/pool/pricing`
 
 ## x402 Payment Flow
 
@@ -180,11 +191,17 @@ IP rotated successfully! New IP: 185.123.xxx.xxx
 | POST /v1/ports | Create port |
 | POST /v1/ports/:id/rotate | Rotate IP |
 | GET /v1/account | Account summary |
-| GET/POST /v1/x402/proxy | Purchase (402 flow) |
+| GET/POST /v1/x402/proxy | Purchase dedicated proxy (402 flow) |
 | GET /v1/x402/countries | Available countries |
 | POST /v1/x402/manage/ports/replace | Replace offline port (free, max 3) |
 | GET /v1/x402/manage/session/topup/calculate | Preview top-up cost |
 | POST /v1/x402/manage/session/topup | Pay to extend session |
+| GET /v1/x402/pool/pricing | Pool Gateway tier catalog (no auth) |
+| GET/POST /v1/x402/pool | Buy Pool Gateway access (402 flow) |
+| GET /v1/x402/manage/pool/credit | Remaining pool GB (X-Session-Token) |
+| POST /v1/x402/manage/pool/topup | Pay USDC for more pool GB |
+| POST /v1/x402/manage/pool/regenerate | Rotate pool credential secret |
+| GET /v1/gateway/pool/stock | Public pool stock (counts per country, no IPs) |
 
 ## Links
 

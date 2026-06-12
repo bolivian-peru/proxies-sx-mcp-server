@@ -172,7 +172,7 @@ export const x402SessionToolDefinitions = [
   },
   {
     name: 'calculate_x402_topup',
-    description: 'Calculate the cost to top up a session with additional traffic and/or duration. Duration extensions are free, traffic costs $4/GB (shared) or $8/GB (private).',
+    description: 'Calculate the cost to top up a session with additional traffic and/or duration. Duration extensions are free; traffic costs $4/GB (metered).',
     inputSchema: {
       type: 'object',
       properties: {

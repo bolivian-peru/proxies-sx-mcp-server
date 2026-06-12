@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.1.0 (2026-06-12)
+
+### Added — x402 Pool Gateway Access (the new product)
+Wallet-only agents can now buy **Pool Gateway access** with USDC, not just a single dedicated port. One credential reaches **every country in your tier** via the username DSL (`psx_xxx-mbl-us`, `-mbl-de`, …). v1 tier = `mbl` ($4/GB, metered, production ProxySmart modems), HTTP proxy on port 7000.
+
+Seven new tools (all in x402 autonomous mode):
+- `x402_get_pool_access` — buy pool access with USDC (402 → pay → retry), caches the returned session token
+- `x402_pool_credit` — remaining GB for a pool session (cached token if omitted)
+- `x402_pool_topup` — pay USDC for more GB (duration-only is free)
+- `x402_pool_regenerate` — rotate the credential secret (same username, new pak password)
+- `x402_pool_connection` — re-emit credentials (recovery)
+- `x402_pool_pricing` — tier catalog (no auth, no wallet)
+- `get_pool_stock` — public online endpoint counts per country (no IPs)
+
+### Fixed
+- **`x402_extend_session` removed.** It called `POST /x402/sessions/:id/extend`, which does not exist. The existing `topup_x402_session` already correctly hits the real route (`POST /x402/manage/session/topup` with `X-Session-Token` + `Payment-Signature`), so the broken duplicate was deleted (definition + zod + handler + client `extendSession` method).
+- Pool client methods correctly prefix `/v1` even when the MCP server is constructed with the bare `https://api.proxies.sx` base URL.
+
+### Changed — pricing corrected to metered-only
+- The platform is **per-GB metered only at $4/GB**; the legacy `$8/GB` private/dedicated tier was removed. Corrected every stale `$8` / private pricing claim in tool descriptions, schemas (`tier` enum is now `shared` only for x402 proxy tools), the pricing-display handler, billing tool descriptions, and all docs (README, SKILL.md, llm.txt, CLAUDE.md). `calculate_price` / `purchase_private_traffic` keep working (the API still accepts `isPrivate`), but are documented honestly — price is computed server-side.
+
+### Tooling
+- Tool count: **61** (44 API-key + 17 x402 autonomous). Was 55.
+
 ## 2.0.1 (2026-04-30)
 
 ### Docs

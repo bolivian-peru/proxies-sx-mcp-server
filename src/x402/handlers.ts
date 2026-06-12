@@ -22,11 +22,13 @@ function toolError(tool: string, message: string, retryable: boolean, suggestion
 }
 
 /**
- * Pricing rates by tier - Duration is FREE, pay only for traffic
+ * Pricing rates by tier - Duration is FREE, pay only for traffic.
+ * Platform is per-GB metered only: $4/GB. The legacy private/dedicated
+ * tier was removed; `private` is retained at the type level only.
  */
 const PRICING_RATES: Record<X402Tier, { perGB: number }> = {
   shared: { perGB: 4.0 },
-  private: { perGB: 8.0 },
+  private: { perGB: 4.0 },
 };
 
 /**
@@ -177,11 +179,10 @@ export function createX402ToolHandlers(
         `Total: $${total.toFixed(2)} USDC`,
         balanceInfo,
         ``,
-        `Tier Rates (duration is always FREE):`,
-        `  shared:  $4.00/GB (shared device, best value)`,
-        `  private: $8.00/GB (exclusive device, guaranteed speed)`,
+        `Rate (duration is always FREE): $4.00/GB, metered.`,
+        `The platform is per-GB metered only - the legacy private/dedicated tier was removed.`,
         ``,
-        `Min purchase: 0.1 GB ($0.40 shared, $0.80 private)`,
+        `Min purchase: 0.1 GB ($0.40)`,
       ].join('\n');
     },
 
@@ -488,44 +489,298 @@ export function createX402ToolHandlers(
     },
 
     /**
-     * Extend an active session
+     * Buy Pool Gateway access with USDC (one credential, every country in tier)
      */
-    async x402_extend_session(args: { session_id?: string; additional_hours?: number }): Promise<string> {
-      const additionalHours = args.additional_hours || 1;
-
-      // Get session from cache
-      const session = args.session_id
-        ? cache.getSession(args.session_id)
-        : cache.getFirstActiveSession();
-
-      if (!session) {
-        if (args.session_id) {
-          return `Session not found: ${args.session_id}. Use x402_list_sessions to see available sessions.`;
-        }
-        return `No active sessions. Use x402_get_proxy to purchase a new proxy first.`;
-      }
+    async x402_get_pool_access(args: {
+      country?: string;
+      traffic_gb?: number;
+      tier?: string;
+      sid?: string;
+      rot?: string;
+    }): Promise<string> {
+      const trafficGB = args.traffic_gb || 1;
+      const tier = args.tier || 'mbl';
 
       try {
-        // Extend via client (handles payment)
-        const extended = await client.extendSession(session.id, additionalHours);
+        // Check balance vs expected cost ($4/GB for mbl)
+        const balance = await wallet.getBalance();
+        const balanceNum = Number(balance.usdc) / 1e6;
+        const expectedCost = trafficGB * 4.0;
 
-        // Update cache with new expiry
-        cache.updateSessionExpiry(session.id, extended.expiresAt);
+        if (balanceNum < expectedCost) {
+          return [
+            `Insufficient USDC balance!`,
+            ``,
+            `Required: ~$${expectedCost.toFixed(2)} USDC (${trafficGB} GB x $4.00/GB)`,
+            `Available: ${balance.formatted}`,
+            ``,
+            `Top up your wallet, then retry:`,
+            wallet.address,
+          ].join('\n');
+        }
 
-        const newExpiry = new Date(extended.expiresAt);
+        const result = await client.purchasePoolAccess({
+          country: args.country,
+          trafficGB,
+          tier,
+          sid: args.sid,
+          rot: args.rot,
+        });
 
+        // Cache the session token for follow-up pool tools
+        if (result.sessionToken) {
+          cache.setPoolToken(result.sessionToken);
+        }
+
+        const { proxy, credit } = result;
+        const httpUrl = proxy.http
+          || `http://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.httpPort}`;
+
+        const lines = [
+          `Pool Gateway access purchased!`,
+          ``,
+          `ONE credential reaches every country in your tier via the username DSL`,
+          `(e.g. ${proxy.username}-mbl-us, -mbl-de, ...). HTTP proxy on port ${proxy.httpPort} only.`,
+          ``,
+          `--- Connection ---`,
+          `HTTP: ${httpUrl}`,
+          `Host: ${proxy.host}`,
+          `Port: ${proxy.httpPort}`,
+          `Username: ${proxy.username}`,
+          `Password: ${proxy.password}`,
+        ];
+        if (proxy.usernameTemplate) {
+          lines.push(`Username template: ${proxy.usernameTemplate}`);
+        }
+        lines.push(
+          ``,
+          `--- Credit (pak-backed) ---`,
+          `Tier: ${credit.tier || tier} ($4/GB, metered, production modems)`,
+          `Allocated: ${credit.allocatedGB} GB`,
+          `Used: ${credit.usedGB} GB`,
+          `Remaining: ${credit.remainingGB} GB`,
+        );
+        if (credit.expiresAt) lines.push(`Expires: ${new Date(credit.expiresAt).toLocaleString()}`);
+        lines.push(
+          ``,
+          `--- Session ---`,
+          `Session token (cached): ${result.sessionToken}`,
+        );
+        if (result.payment) {
+          lines.push(``, `--- Payment ---`);
+          if (result.payment.amountUSDC !== undefined) lines.push(`Amount: $${result.payment.amountUSDC} USDC`);
+          if (result.payment.network) lines.push(`Network: ${result.payment.network}`);
+          if (result.payment.transactionHash) lines.push(`TX: ${result.payment.transactionHash}`);
+        }
+        lines.push(
+          ``,
+          `Note: sticky pins the MODEM, not the IP - carrier NAT may still re-issue the egress IP.`,
+        );
+        if (result.caveats && result.caveats.length > 0) {
+          lines.push(``, ...result.caveats.map((c) => `- ${c}`));
+        }
+
+        return lines.join('\n');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const isBalance = message.toLowerCase().includes('insufficient');
+        return toolError(
+          'x402_get_pool_access',
+          message,
+          !isBalance,
+          isBalance ? `Top up your wallet with USDC: ${wallet.address}` : 'Check tier/country and retry',
+        );
+      }
+    },
+
+    /**
+     * Check remaining pool credit
+     */
+    async x402_pool_credit(args: { session_token?: string }): Promise<string> {
+      const token = args.session_token || cache.getPoolToken();
+      if (!token) {
+        return `No pool session token provided or cached. Buy pool access first with x402_get_pool_access.`;
+      }
+      try {
+        const credit = await client.getPoolCredit(token);
         return [
-          `Session Extended Successfully!`,
+          `Pool Gateway Credit`,
           ``,
-          `Session: ${session.id}`,
-          `Added: ${additionalHours} hour(s)`,
-          `New Expiry: ${newExpiry.toLocaleString()}`,
+          `Tier: ${credit.tier || 'mbl'}`,
+          `Allocated: ${credit.allocatedGB} GB`,
+          `Used: ${credit.usedGB} GB`,
+          `Remaining: ${credit.remainingGB} GB`,
+          `Status: ${credit.enabled ? 'enabled' : 'suspended (cap reached or disabled)'}`,
+          credit.expiresAt ? `Expires: ${new Date(credit.expiresAt).toLocaleString()}` : '',
+        ].filter(Boolean).join('\n');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return toolError('x402_pool_credit', message, true);
+      }
+    },
+
+    /**
+     * Top up a pool session with more GB and/or duration
+     */
+    async x402_pool_topup(args: {
+      session_token?: string;
+      add_traffic_gb?: number;
+      add_duration_seconds?: number;
+    }): Promise<string> {
+      const token = args.session_token || cache.getPoolToken();
+      if (!token) {
+        return `No pool session token provided or cached. Buy pool access first with x402_get_pool_access.`;
+      }
+      if (!args.add_traffic_gb && !args.add_duration_seconds) {
+        return `Specify add_traffic_gb (paid, $4/GB) and/or add_duration_seconds (free).`;
+      }
+      try {
+        if (args.add_traffic_gb && args.add_traffic_gb > 0) {
+          const cost = args.add_traffic_gb * 4.0;
+          const balance = await wallet.getBalance();
+          const balanceNum = Number(balance.usdc) / 1e6;
+          if (balanceNum < cost) {
+            return [
+              `Insufficient USDC balance for top-up!`,
+              ``,
+              `Required: ~$${cost.toFixed(2)} USDC (${args.add_traffic_gb} GB x $4.00/GB)`,
+              `Available: ${balance.formatted}`,
+              ``,
+              `Top up your wallet, then retry: ${wallet.address}`,
+            ].join('\n');
+          }
+        }
+
+        const credit = await client.topUpPool(token, {
+          addTrafficGB: args.add_traffic_gb,
+          addDurationSeconds: args.add_duration_seconds,
+        });
+
+        const isFree = !args.add_traffic_gb || args.add_traffic_gb <= 0;
+        return [
+          `Pool Session Topped Up!`,
           ``,
-          `Your proxy connection details remain the same.`,
+          isFree ? `Added duration (free).` : `Added ${args.add_traffic_gb} GB ($${(args.add_traffic_gb! * 4).toFixed(2)} USDC).`,
+          args.add_duration_seconds ? `Added duration: ${args.add_duration_seconds}s (free).` : '',
+          ``,
+          `--- Updated Credit ---`,
+          `Allocated: ${credit.allocatedGB} GB`,
+          `Used: ${credit.usedGB} GB`,
+          `Remaining: ${credit.remainingGB} GB`,
+          credit.expiresAt ? `Expires: ${new Date(credit.expiresAt).toLocaleString()}` : '',
+        ].filter(Boolean).join('\n');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return toolError('x402_pool_topup', message, true);
+      }
+    },
+
+    /**
+     * Rotate the pool credential secret (same username, new password)
+     */
+    async x402_pool_regenerate(args: { session_token?: string }): Promise<string> {
+      const token = args.session_token || cache.getPoolToken();
+      if (!token) {
+        return `No pool session token provided or cached. Buy pool access first with x402_get_pool_access.`;
+      }
+      try {
+        const result = await client.regeneratePool(token);
+        const { proxy } = result;
+        const httpUrl = proxy.http
+          || `http://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.httpPort}`;
+        return [
+          `Pool Credential Rotated!`,
+          ``,
+          `Same username, new password.`,
+          ``,
+          `--- New Connection ---`,
+          `HTTP: ${httpUrl}`,
+          `Username: ${proxy.username}`,
+          `Password: ${proxy.password}`,
         ].join('\n');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
-        return toolError('x402_extend_session', message, true);
+        return toolError('x402_pool_regenerate', message, true);
+      }
+    },
+
+    /**
+     * Re-emit pool credentials (recovery)
+     */
+    async x402_pool_connection(args: { session_token?: string }): Promise<string> {
+      const token = args.session_token || cache.getPoolToken();
+      if (!token) {
+        return `No pool session token provided or cached. Buy pool access first with x402_get_pool_access.`;
+      }
+      try {
+        const result = await client.getPoolConnection(token);
+        const { proxy } = result;
+        const httpUrl = proxy.http
+          || `http://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.httpPort}`;
+        const lines = [
+          `Pool Gateway Connection`,
+          ``,
+          `HTTP: ${httpUrl}`,
+          `Host: ${proxy.host}`,
+          `Port: ${proxy.httpPort}`,
+          `Username: ${proxy.username}`,
+          `Password: ${proxy.password}`,
+        ];
+        if (proxy.usernameTemplate) lines.push(`Username template: ${proxy.usernameTemplate}`);
+        return lines.join('\n');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return toolError('x402_pool_connection', message, true);
+      }
+    },
+
+    /**
+     * Get the Pool Gateway tier catalog (no auth)
+     */
+    async x402_pool_pricing(): Promise<string> {
+      try {
+        const pricing = await client.getPoolPricing();
+        const lines = [
+          `Pool Gateway Pricing`,
+          ``,
+          `Default tier: ${pricing.defaultTier || 'mbl'}`,
+          ``,
+          `--- Tiers ---`,
+        ];
+        for (const t of pricing.tiers || []) {
+          const parts = [`${t.tier}: $${t.pricePerGB}/GB, metered`];
+          if (t.minPurchaseGB) parts.push(`min ${t.minPurchaseGB} GB`);
+          if (t.quality) parts.push(t.quality);
+          lines.push(`  ${parts.join(' - ')}`);
+        }
+        if (pricing.usernameDsl) {
+          lines.push(``, `--- Username DSL ---`, pricing.usernameDsl);
+        }
+        if (pricing.stockUrl) lines.push(``, `Stock: ${pricing.stockUrl}`);
+        lines.push(``, `v1 = mbl tier ($4/GB, metered, production modems).`);
+        return lines.join('\n');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return toolError('x402_pool_pricing', message, true);
+      }
+    },
+
+    /**
+     * Get public pool stock (counts per country, no IPs)
+     */
+    async get_pool_stock(): Promise<string> {
+      try {
+        const stock = await client.getPoolStock();
+        return [
+          `Pool Gateway Stock (online endpoint counts per country - no IPs)`,
+          ``,
+          '```json',
+          JSON.stringify(stock, null, 2),
+          '```',
+        ].join('\n');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return toolError('get_pool_stock', message, true);
       }
     },
 

@@ -7,10 +7,10 @@
 [![npm version](https://img.shields.io/npm/v/@proxies-sx/mcp-server.svg)](https://www.npmjs.com/package/@proxies-sx/mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-compatible-7c5cff.svg)](https://modelcontextprotocol.io)
-[![tools](https://img.shields.io/badge/tools-55-3aa0ff.svg)](#-tool-catalog-55-tools)
+[![tools](https://img.shields.io/badge/tools-61-3aa0ff.svg)](#-tool-catalog-61-tools)
 [![x402](https://img.shields.io/badge/x402-USDC%20on%20Base%20%2B%20Solana-39c5cf.svg)](#-x402--autonomous-onchain-payments)
 
-[Quickstart](#-30-second-quickstart) · [Two modes](#-two-ways-to-authenticate) · [Tool catalog](#-tool-catalog-55-tools) · [x402](#-x402--autonomous-onchain-payments) · [Docs](https://client.proxies.sx/mcp-server) · [AI hub](https://agents.proxies.sx)
+[Quickstart](#-30-second-quickstart) · [Two modes](#-two-ways-to-authenticate) · [Tool catalog](#-tool-catalog-61-tools) · [x402](#-x402--autonomous-onchain-payments) · [Docs](https://client.proxies.sx/mcp-server) · [AI hub](https://agents.proxies.sx)
 
 </div>
 
@@ -22,9 +22,12 @@ Give Claude (or any MCP client) the keys to a real **mobile-proxy network**: cre
 You:  "Get me a US mobile proxy with 2 GB and rotate the IP."
 Claude → x402_get_proxy(country=US, trafficGB=2)  →  pays $8 USDC on Base  →  returns live creds
 Claude → x402_rotate_ip()                          →  fresh carrier IP
+
+You:  "Buy me pool access so I can hit any country with one credential."
+Claude → x402_get_pool_access(traffic_gb=5)        →  pays $20 USDC  →  one DSL credential
 ```
 
-> **Mobile proxies, metered honestly.** Real 4G/5G carrier IPs across 6+ countries. **$4 / GB, GB never expires.** Duration is always free — you only pay for data.
+> **Mobile proxies, metered honestly.** Real 4G/5G carrier IPs across 6+ countries. **$4 / GB, metered, GB never expires.** Duration is always free — you only pay for data. (The legacy private/dedicated tier was removed.)
 
 ---
 
@@ -66,7 +69,7 @@ Then drop it into your MCP client. For **Claude Desktop**, edit
 }
 ```
 
-Restart Claude Desktop → you'll see **55 tools** available. Works the same in Cursor, Cline, Continue, or any MCP-compatible client.
+Restart Claude Desktop → you'll see **61 tools** available. Works the same in Cursor, Cline, Continue, or any MCP-compatible client.
 
 ---
 
@@ -96,7 +99,7 @@ The agent now buys proxies **autonomously** — it signs a USDC payment, the ser
 
 ---
 
-## 🧰 Tool catalog (55 tools)
+## 🧰 Tool catalog (61 tools)
 
 <details open>
 <summary><b>Account &amp; billing</b> — balance, pricing, buy traffic</summary>
@@ -104,11 +107,11 @@ The agent now buys proxies **autonomously** — it signs a USDC payment, the ser
 | Tool | What it does |
 |---|---|
 | `get_account_summary` | Balance, email, slot &amp; traffic usage |
-| `get_account_usage` | Traffic breakdown (shared vs private) |
-| `get_pricing` | Live pricing — **$4/GB shared, $8/GB private**, volume discounts |
+| `get_account_usage` | Traffic breakdown by category |
+| `get_pricing` | Live pricing — **$4/GB, metered**, volume discounts |
 | `calculate_price` | Price a GB amount with volume discount applied |
-| `purchase_shared_traffic` | Buy shared GB from balance (also raises your free slot tier) |
-| `purchase_private_traffic` | Buy private (dedicated-modem) GB from balance |
+| `purchase_shared_traffic` | Buy GB from balance (also raises your free slot tier) |
+| `purchase_private_traffic` | Legacy buy-GB tool (still accepted by the API; price is metered $4/GB) |
 </details>
 
 <details>
@@ -177,14 +180,32 @@ The agent now buys proxies **autonomously** — it signs a USDC payment, the ser
 
 | Tool | What it does |
 |---|---|
-| `x402_get_proxy` | **Buy a proxy with USDC on-chain** — returns creds + session token |
-| `x402_get_pricing` | Quote a purchase ($4/GB, duration free) |
+| `x402_get_proxy` | **Buy a dedicated proxy with USDC on-chain** — returns creds + session token |
+| `x402_get_pricing` | Quote a purchase ($4/GB metered, duration free) |
 | `x402_wallet_balance` | USDC balance + wallet address |
 | `x402_rotate_ip` | Free IP rotation via rotation token |
-| `x402_extend_session` | Pay USDC to add traffic/duration |
 | `x402_list_sessions` · `x402_check_session` | List / inspect your wallet's sessions |
 | `x402_list_countries` · `x402_list_cities` · `x402_list_carriers` | Live geo + carrier targeting |
 | `x402_service_status` | Health check |
+
+To extend a dedicated-port session, use the session-management `calculate_x402_topup` / `topup_x402_session` tools.
+</details>
+
+<details>
+<summary><b>x402 Pool Gateway access</b> 🆕 — one credential, every country in your tier</summary>
+
+| Tool | What it does |
+|---|---|
+| `x402_get_pool_access` | **Buy Pool Gateway access with USDC** — one DSL credential reaches every country in your tier. v1 = `mbl` ($4/GB, production modems), HTTP :7000 |
+| `x402_pool_credit` | Remaining GB on the pool session (cached token if omitted) |
+| `x402_pool_topup` | Pay USDC for more GB (duration-only is free) |
+| `x402_pool_regenerate` | Rotate the credential secret (same username, new password) |
+| `x402_pool_connection` | Re-emit credentials (recovery) |
+| `x402_pool_pricing` | Tier catalog + username DSL (no auth) |
+| `get_pool_stock` | Public online endpoint counts per country (no IPs) |
+
+> One credential, every country: `psx_xxx-mbl-us`, `psx_xxx-mbl-de`, … via the username DSL.
+> **Sticky pins the modem, not the IP** — carrier NAT may still re-issue the egress IP.
 </details>
 
 ---
@@ -200,9 +221,10 @@ agent ──▶ x402_get_proxy(US, 2GB)
    Base (eip155:8453)  or  Solana   ──▶  on-chain verify  ──▶  live proxy creds + session token
 ```
 
-- **Pricing:** $4 / GB (shared) · $8 / GB (private). **Duration is free.** Min $0.40.
+- **Pricing:** **$4 / GB, metered** (the legacy private/dedicated tier was removed). **Duration is free.** Min $0.40.
 - **Networks:** Base (USDC, ~2 s) and Solana (USDC, ~400 ms).
 - **No account, no card, no human.** The wallet *is* the identity.
+- **Pool Gateway access:** buy one credential that reaches every country in your tier with `x402_get_pool_access` (v1 `mbl` tier, $4/GB).
 
 Build agents directly on the protocol with the open-source SDK: `@proxies-sx/x402-core`, `@proxies-sx/x402-hono`, `@proxies-sx/x402-solana`.
 
@@ -235,7 +257,7 @@ git clone https://github.com/bolivian-peru/proxies-sx-mcp-server
 cd proxies-sx-mcp-server && npm install && npm run build && npm start
 ```
 
-Verify: `npx @proxies-sx/mcp-server --version` (it should report **55 tools available**).
+Verify: `npx @proxies-sx/mcp-server --version` (it should report **61 tools available**).
 
 ---
 
