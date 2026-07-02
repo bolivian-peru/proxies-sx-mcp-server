@@ -16,7 +16,7 @@ import type { ProxiesApi } from '../api/index.js';
 export const referenceToolDefinitions = [
   {
     name: 'list_available_countries',
-    description: 'List countries where proxy ports can be created (only shows countries with available devices)',
+    description: 'List countries where proxy ports can be created (only shows countries with available devices). Returns countryId for each country - use this countryId when creating ports or querying country-specific data.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -50,7 +50,7 @@ export function createReferenceToolHandlers(api: ProxiesApi) {
 
         for (const country of countries) {
           const flag = country.flag || '';
-          lines.push(`${flag} ${country.name} (${country.code}) - ${country.freeDeviceCount} device(s) available - ID: ${country._id}`);
+          lines.push(`${flag} ${country.name} (${country.code}) - ${country.freeDeviceCount} device(s) available - countryId: ${country._id}`);
         }
 
         return lines.join('\n');

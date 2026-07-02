@@ -1,268 +1,713 @@
-<div align="center">
-
-# 🛰️ @proxies-sx/mcp-server
-
-**The Model Context Protocol server that lets AI agents buy and run mobile proxies — by themselves.**
+# @proxies-sx/mcp-server
 
 [![npm version](https://img.shields.io/npm/v/@proxies-sx/mcp-server.svg)](https://www.npmjs.com/package/@proxies-sx/mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![MCP](https://img.shields.io/badge/MCP-compatible-7c5cff.svg)](https://modelcontextprotocol.io)
-[![tools](https://img.shields.io/badge/tools-61-3aa0ff.svg)](#-tool-catalog-61-tools)
-[![x402](https://img.shields.io/badge/x402-USDC%20on%20Base%20%2B%20Solana-39c5cf.svg)](#-x402--autonomous-onchain-payments)
 
-[Quickstart](#-30-second-quickstart) · [Two modes](#-two-ways-to-authenticate) · [Tool catalog](#-tool-catalog-61-tools) · [x402](#-x402--autonomous-onchain-payments) · [Docs](https://client.proxies.sx/mcp-server) · [AI hub](https://agents.proxies.sx)
+MCP (Model Context Protocol) server for AI agents to manage [mobile proxy infrastructure](https://proxies.sx) on [Proxies.sx](https://proxies.sx).
 
-</div>
+This server enables AI assistants like Claude to manage your proxy ports, rotate IPs, purchase resources, and more through natural language commands. Learn more about [MCP integration](https://proxies.sx/mcp) and [x402 autonomous payments](https://proxies.sx/x402).
 
----
+## Two Authentication Modes
 
-Give Claude (or any MCP client) the keys to a real **mobile-proxy network**: create ports, rotate IPs, buy traffic, check status, open support tickets — all through natural language. Two ways to pay: a normal **API key**, or **x402** so an agent pays **USDC on-chain with no account at all**.
+### 1. API Key Mode (Account Required)
+Use your [Proxies.sx account](https://client.proxies.sx) and API key to manage existing subscriptions.
 
-```text
-You:  "Get me a US mobile proxy with 2 GB and rotate the IP."
-Claude → x402_get_proxy(country=US, trafficGB=2)  →  pays $8 USDC on Base  →  returns live creds
-Claude → x402_rotate_ip()                          →  fresh carrier IP
-
-You:  "Buy me pool access so I can hit any country with one credential."
-Claude → x402_get_pool_access(traffic_gb=5)        →  pays $20 USDC  →  one DSL credential
-```
-
-> **Mobile proxies, metered honestly.** Real 4G/5G carrier IPs across 6+ countries. **$4 / GB, metered, GB never expires.** Duration is always free — you only pay for data. (The legacy private/dedicated tier was removed.)
+### 2. x402 Payment Mode (No Account Needed)
+AI agents can autonomously purchase proxies using USDC on Base or Solana networks - no account required! See our [x402 documentation](https://proxies.sx/x402) for details.
 
 ---
 
-## 👥 Two audiences — pick your door
+## Features
 
-| You are… | You want to… | Use |
-|---|---|---|
-| **An AI agent / developer / buyer** | Buy and operate proxies programmatically | **This MCP server** (or the [REST API](https://api.proxies.sx/v1)) |
-| **A device owner / farmer** | *Earn* by sharing bandwidth from phones | The **Peer SDK** → [agents.proxies.sx/peer](https://agents.proxies.sx/peer) |
-
-This server is the **buyer / consumer** side. Farming and peer registration is a separate flow with its own SDK — see the peer hub above. (No peer-registration tools live here by design.)
+- **Account Management**: Check balance, usage, and resource allocation
+- **Port Management**: Create, configure, delete proxy ports
+- **IP Rotation**: Manual and automatic rotation with customizable settings
+- **Status Monitoring**: Check port status, IP addresses, latency, speed
+- **Billing**: Purchase slots and traffic using account balance
+- **Crypto Payments**: Top up balance with BTC, ETH, USDT, and 50+ cryptocurrencies
+- **x402 Autonomous Payments**: AI agents pay with USDC - no account needed
+- **Reference Data**: List available countries, carriers, and cities
 
 ---
 
-## ⚡ 30-second quickstart
+## Installation
+
+### Option 1: npx (Recommended - No Install)
+
+The easiest way to use this MCP server - no installation required:
 
 ```bash
-# No install needed — just run it
 npx @proxies-sx/mcp-server
 ```
 
-Then drop it into your MCP client. For **Claude Desktop**, edit
-`~/Library/Application Support/Claude/claude_desktop_config.json`:
+### Option 2: npm Install (Global)
 
-```jsonc
+Install globally to use the `proxies-sx-mcp` command anywhere:
+
+```bash
+npm install -g @proxies-sx/mcp-server
+```
+
+After installation, run with:
+
+```bash
+proxies-sx-mcp
+```
+
+### Option 3: npm Install (Local Project)
+
+Add to your project as a dependency:
+
+```bash
+npm install @proxies-sx/mcp-server
+```
+
+Then run with:
+
+```bash
+npx proxies-sx-mcp
+```
+
+### Option 4: From Source
+
+```bash
+git clone https://github.com/proxies-sx/mcp-server.git
+cd mcp-server
+npm install
+npm run build
+npm start
+```
+
+### What Gets Installed
+
+When you run `npm install @proxies-sx/mcp-server`:
+
+```
+@proxies-sx/mcp-server (904 KB)
+├── @modelcontextprotocol/sdk  (MCP protocol implementation)
+├── viem                       (Ethereum/Base wallet operations)
+└── zod                        (Input validation)
+
+Total: ~88 MB with all dependencies
+```
+
+**Package contents:**
+- `dist/` - Compiled JavaScript + TypeScript definitions
+- `README.md` - Documentation
+- `LICENSE` - MIT License
+- `llm.txt` - AI agent discovery document
+
+---
+
+## Verify Installation
+
+After installing, verify the package works:
+
+```bash
+# Check version
+npm list @proxies-sx/mcp-server
+
+# Test loading (should show "72 tools available")
+node -e "const t = require('@proxies-sx/mcp-server/dist/tools'); console.log(t.allToolDefinitions.length + ' tools available')"
+```
+
+---
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Mode | Required | Description |
+|----------|------|----------|-------------|
+| `PROXIES_API_KEY` | API Key | Yes | Your Proxies.sx API key |
+| `AGENT_WALLET_KEY` | x402 | Yes | Private key for USDC payments (Base or Solana) |
+| `PROXIES_API_URL` | Both | No | Custom API URL (default: `https://api.proxies.sx/v1`) |
+
+### Mode 1: API Key Authentication
+
+1. Log in to [client.proxies.sx](https://client.proxies.sx)
+2. Go to Account Settings
+3. Create a new API key with scopes:
+   - `ports:read`, `ports:write`, `ports:rotate` - Port management
+   - `billing:read`, `billing:write` - Purchases
+   - `account:read` - Account info
+   - `traffic:read` - Usage data
+
+### Mode 2: x402 Autonomous Payments
+
+No account needed! The agent uses a crypto wallet to pay directly:
+
+1. Create a wallet on Base or Solana network
+2. Fund it with USDC (minimum $0.40 for 0.1 GB, or $4.00 for 1 GB)
+3. Add a small amount of ETH (Base) or SOL (Solana) for gas fees (~$0.01)
+4. Set `AGENT_WALLET_KEY` to your private key
+
+---
+
+## Usage with Claude Desktop
+
+### API Key Mode
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
 {
   "mcpServers": {
     "proxies-sx": {
       "command": "npx",
       "args": ["-y", "@proxies-sx/mcp-server"],
       "env": {
-        // Pick ONE mode (see below)
         "PROXIES_API_KEY": "psx_your_api_key_here"
-        // — or — autonomous on-chain payments:
-        // "AGENT_WALLET_KEY": "0xYOUR_PRIVATE_KEY"
       }
     }
   }
 }
 ```
 
-Restart Claude Desktop → you'll see **61 tools** available. Works the same in Cursor, Cline, Continue, or any MCP-compatible client.
+### x402 Payment Mode (Autonomous)
 
----
-
-## 🔑 Two ways to authenticate
-
-### Mode 1 — API key (you have an account)
-
-1. Log in to [client.proxies.sx](https://client.proxies.sx) → **Account → API Keys**.
-2. Create a key with the scopes you need: `ports:read` `ports:write` `ports:rotate` `billing:read` `billing:write` `account:read` `traffic:read`.
-3. Set `PROXIES_API_KEY=psx_…`.
-
-Best for: existing customers, dashboards, scripts, persistent automation.
-
-### Mode 2 — x402 (no account, the agent pays on-chain) 🤖
-
-1. Create a wallet on **Base** or **Solana**.
-2. Fund it with **USDC** (min $0.40 for 0.1 GB) + a few cents of ETH/SOL for gas.
-3. Set `AGENT_WALLET_KEY=<private key>`.
-
-The agent now buys proxies **autonomously** — it signs a USDC payment, the server verifies it on-chain (~2 s on Base, ~400 ms on Solana), and returns live credentials. No signup, no card, no human.
-
-| Variable | Mode | Required | Default |
-|---|---|---|---|
-| `PROXIES_API_KEY` | API key | yes (this mode) | — |
-| `AGENT_WALLET_KEY` | x402 | yes (this mode) | — |
-| `PROXIES_API_URL` | both | no | `https://api.proxies.sx/v1` |
-
----
-
-## 🧰 Tool catalog (61 tools)
-
-<details open>
-<summary><b>Account &amp; billing</b> — balance, pricing, buy traffic</summary>
-
-| Tool | What it does |
-|---|---|
-| `get_account_summary` | Balance, email, slot &amp; traffic usage |
-| `get_account_usage` | Traffic breakdown by category |
-| `get_pricing` | Live pricing — **$4/GB, metered**, volume discounts |
-| `calculate_price` | Price a GB amount with volume discount applied |
-| `purchase_shared_traffic` | Buy GB from balance (also raises your free slot tier) |
-| `purchase_private_traffic` | Legacy buy-GB tool (still accepted by the API; price is metered $4/GB) |
-</details>
-
-<details>
-<summary><b>Ports</b> — create, inspect, reconfigure, delete</summary>
-
-| Tool | What it does |
-|---|---|
-| `list_ports` | All ports with filters (type, status, location) |
-| `get_port` | Full detail for one port |
-| `create_port` | New port in a country (optional carrier/city) |
-| `reconfigure_port` | Move a port to a new country/carrier/city |
-| `update_port_credentials` | Change a port's login/password |
-| `update_os_fingerprint` | p0f OS spoofing for a port |
-| `delete_port` | Remove a port |
-</details>
-
-<details>
-<summary><b>Status &amp; utilities</b> — health, IP, formats</summary>
-
-| Tool | What it does |
-|---|---|
-| `get_port_status` · `get_port_ip` · `ping_port` · `speed_test_port` | Online check, current IP, latency, speed |
-| `get_proxy_connection_string` · `get_all_proxy_formats` | Ready-to-paste HTTP/SOCKS5 strings, every common format |
-| `get_os_fingerprint_options` · `list_available_countries` | Spoofing options, live country availability |
-</details>
-
-<details>
-<summary><b>Rotation</b> — change IP on demand or on a schedule</summary>
-
-| Tool | What it does |
-|---|---|
-| `rotate_port` | Swap to a new modem/IP, keep credentials |
-| `check_rotation_availability` | Cooldown / circuit-breaker check |
-| `configure_auto_rotation` | Auto-rotate every N minutes |
-| `get_rotation_history` · `get_rotation_token_url` | Audit trail · public no-auth rotate URL |
-</details>
-
-<details>
-<summary><b>Crypto top-ups (CoinGate)</b> — fund a balance with crypto</summary>
-
-| Tool | What it does |
-|---|---|
-| `create_crypto_payment` · `check_crypto_payment_status` | Open a hosted crypto order · poll it |
-| `get_pending_crypto_payments` · `cancel_crypto_payment` · `get_crypto_payment_info` | Manage pending orders, supported coins |
-</details>
-
-<details>
-<summary><b>Support</b> — talk to humans from inside the agent</summary>
-
-`create_support_ticket` · `list_my_tickets` · `get_ticket` · `reply_to_ticket` · `close_ticket`
-</details>
-
-<details>
-<summary><b>x402 session management</b> — operate a session bought on-chain</summary>
-
-| Tool | What it does |
-|---|---|
-| `get_x402_session` · `list_x402_ports` · `get_x402_port_status` | Session detail, all ports, per-port status |
-| `get_sessions_by_wallet` · `get_session_status` | Recover sessions by wallet · quick status |
-| `replace_x402_port` | Swap an offline port to a new device — **free, max 3/session** |
-| `calculate_x402_topup` · `topup_x402_session` | Preview top-up · pay USDC to add traffic/duration |
-</details>
-
-<details>
-<summary><b>x402 autonomous</b> — buy &amp; run proxies with a wallet, no account</summary>
-
-| Tool | What it does |
-|---|---|
-| `x402_get_proxy` | **Buy a dedicated proxy with USDC on-chain** — returns creds + session token |
-| `x402_get_pricing` | Quote a purchase ($4/GB metered, duration free) |
-| `x402_wallet_balance` | USDC balance + wallet address |
-| `x402_rotate_ip` | Free IP rotation via rotation token |
-| `x402_list_sessions` · `x402_check_session` | List / inspect your wallet's sessions |
-| `x402_list_countries` · `x402_list_cities` · `x402_list_carriers` | Live geo + carrier targeting |
-| `x402_service_status` | Health check |
-
-To extend a dedicated-port session, use the session-management `calculate_x402_topup` / `topup_x402_session` tools.
-</details>
-
-<details>
-<summary><b>x402 Pool Gateway access</b> 🆕 — one credential, every country in your tier</summary>
-
-| Tool | What it does |
-|---|---|
-| `x402_get_pool_access` | **Buy Pool Gateway access with USDC** — one DSL credential reaches every country in your tier. v1 = `mbl` ($4/GB, production modems), HTTP :7000 |
-| `x402_pool_credit` | Remaining GB on the pool session (cached token if omitted) |
-| `x402_pool_topup` | Pay USDC for more GB (duration-only is free) |
-| `x402_pool_regenerate` | Rotate the credential secret (same username, new password) |
-| `x402_pool_connection` | Re-emit credentials (recovery) |
-| `x402_pool_pricing` | Tier catalog + username DSL (no auth) |
-| `get_pool_stock` | Public online endpoint counts per country (no IPs) |
-
-> One credential, every country: `psx_xxx-mbl-us`, `psx_xxx-mbl-de`, … via the username DSL.
-> **Sticky pins the modem, not the IP** — carrier NAT may still re-issue the egress IP.
-</details>
-
----
-
-## 💸 x402 — autonomous on-chain payments
-
-[x402](https://www.x402.org) revives **HTTP 402 Payment Required** for the agent economy. Your agent requests a proxy, gets a price, signs a USDC transfer, and retries with the transaction — the server verifies on-chain and provisions instantly.
-
-```
-agent ──▶ x402_get_proxy(US, 2GB)
-          │  402 Payment Required → pay $8 USDC
-          ▼
-   Base (eip155:8453)  or  Solana   ──▶  on-chain verify  ──▶  live proxy creds + session token
+```json
+{
+  "mcpServers": {
+    "proxies-sx": {
+      "command": "npx",
+      "args": ["-y", "@proxies-sx/mcp-server"],
+      "env": {
+        "AGENT_WALLET_KEY": "0x_your_private_key_here"
+      }
+    }
+  }
+}
 ```
 
-- **Pricing:** **$4 / GB, metered** (the legacy private/dedicated tier was removed). **Duration is free.** Min $0.40.
-- **Networks:** Base (USDC, ~2 s) and Solana (USDC, ~400 ms).
-- **No account, no card, no human.** The wallet *is* the identity.
-- **Pool Gateway access:** buy one credential that reaches every country in your tier with `x402_get_pool_access` (v1 `mbl` tier, $4/GB).
-
-Build agents directly on the protocol with the open-source SDK: `@proxies-sx/x402-core`, `@proxies-sx/x402-hono`, `@proxies-sx/x402-solana`.
+Then restart Claude Desktop.
 
 ---
 
-## 📚 Recipes &amp; deeper docs
+## x402 Protocol - Autonomous AI Payments
 
-- **In-app docs & setup wizard:** [client.proxies.sx/mcp-server](https://client.proxies.sx/mcp-server)
-- **AI-agent hub (x402, skill files, marketplace):** [agents.proxies.sx](https://agents.proxies.sx)
-- **Agent skill file (drop-in for Claude):** [agents.proxies.sx/skill.md](https://agents.proxies.sx/skill.md)
-- **Live system map:** [agents.proxies.sx/system-map](https://agents.proxies.sx/system-map)
-- **Pool Gateway DSL & docs:** [client.proxies.sx/pool-proxy](https://client.proxies.sx/pool-proxy)
-- **Want to *earn* instead of buy?** [agents.proxies.sx/peer](https://agents.proxies.sx/peer)
-- Ready-made flows live in [`recipes/`](./recipes); machine-readable catalog in [`SKILL.md`](./SKILL.md) and [`llm.txt`](./llm.txt).
+The [x402 protocol](https://x402.org) enables machine-to-machine payments using HTTP 402 Payment Required.
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          x402 PAYMENT FLOW                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   1. Agent requests proxy                                                   │
+│   ┌─────────────────────┐       ┌──────────────────────────────────────┐   │
+│   │ MCP Server          │──────▶│ api.proxies.sx/v1/x402/proxy        │   │
+│   │ @proxies-sx/mcp     │       │                                      │   │
+│   └─────────────────────┘       │  Returns 402 Payment Required        │   │
+│                                 │  with payment requirements           │   │
+│                                 └──────────────────────────────────────┘   │
+│                                              │                              │
+│   2. Agent signs USDC payment                ▼                              │
+│   ┌─────────────────────┐       ┌──────────────────────────────────────┐   │
+│   │ Agent Wallet (viem) │       │ Payment Requirements:                │   │
+│   │ Signs ERC-20 permit │       │ - Amount: $4.00 USDC (1GB)    │   │
+│   └──────────┬──────────┘       │ - Network: Base or Solana            │   │
+│              │                  │ - Recipient: Proxies.sx wallet       │   │
+│              ▼                  └──────────────────────────────────────┘   │
+│   3. Payment settled via x402.org facilitator                              │
+│   ┌─────────────────────┐       ┌──────────────────────────────────────┐   │
+│   │ Retry request with  │──────▶│ Payment verified & settled on-chain │   │
+│   │ payment signature   │       │ (Base L2 or Solana)                  │   │
+│   └──────────┬──────────┘       └──────────────────────────────────────┘   │
+│              │                                                              │
+│              ▼                                                              │
+│   4. Proxy credentials returned                                            │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │ PROXY CREDENTIALS                                                    │   │
+│   │ - HTTP: http://user:pass@server:8500                                │   │
+│   │ - SOCKS5: socks5://user:pass@server:5500                            │   │
+│   │ - Session token for management                                      │   │
+│   │ - Rotation URL for IP changes                                       │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### x402 Pricing
+
+Duration is always **FREE** — you only pay for traffic.
+
+| Tier | Port Price | Traffic Price | Min Purchase |
+|------|------------|---------------|-------------|
+| **Shared** | FREE | **$4.00/GB** | 0.1 GB ($0.40) |
+
+Available countries: **DE, PL, US, FR, ES, GB** (dynamic based on device availability)
+
+### Supported Networks
+
+| Network | USDC Address | Recipient |
+|---------|--------------|-----------|
+| **Base** | `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913` | `0xF8cD900794245fc36CBE65be9afc23CDF5103042` |
+| **Solana** | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | `6eUdVwsPArTxwVqEARYGCh4S2qwW2zCs7jSEDRpxydnv` |
+
+### x402 Tools (Detailed)
+
+| Tool | What It Does |
+|------|-------------|
+| `x402_get_proxy` | Purchase a mobile proxy automatically. Sends USDC on-chain, waits for confirmation, returns proxy credentials (host, port, username, password, session token, rotation token). Specify country and traffic in GB. |
+| `x402_get_pricing` | Get current pricing — $4/GB. Shows minimum purchase (0.1 GB), duration rules, and available countries with live device counts. |
+| `x402_list_sessions` | List all active proxy sessions for your wallet. Shows session ID, traffic used/remaining, expiration, port count, and status. |
+| `x402_check_session` | Get detailed session info by ID — includes all port credentials, traffic stats, and expiration. Use this to retrieve your proxy details. |
+| `x402_wallet_balance` | Check your USDC balance on Base or Solana. Shows available funds and whether you have enough for a purchase. |
+| `x402_rotate_ip` | Rotate to a new IP address using the rotation token from your proxy purchase. Free, no payment needed. Returns the new IP. |
+| `x402_list_countries` | List countries where proxies are available with live device counts. Currently: DE, PL, US, FR, ES, GB. |
+| `x402_list_cities` | List available cities within a specific country. |
+| `x402_list_carriers` | List mobile carriers available in a country (e.g., AT&T, Verizon, T-Mobile for US). |
+| `x402_extend_session` | Add more traffic or extend duration on an existing session. Calculates cost and sends USDC payment automatically. Traffic: $4/GB. Duration extensions are free. |
+| `x402_service_status` | Health check — verifies the x402 service is running and accepting payments. |
 
 ---
 
-## 🛠️ Install options
+## API Key Mode Tools
+
+### Account Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_account_summary` | Get account balance and resource usage |
+| `get_account_usage` | Get detailed traffic breakdown |
+
+### Port Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_ports` | List all proxy ports with filters |
+| `get_port` | Get detailed port information |
+| `create_port` | Create a new proxy port |
+| `delete_port` | Delete a proxy port |
+| `update_port_credentials` | Update port login/password |
+| `update_os_fingerprint` | Set OS fingerprint spoofing |
+| `reconfigure_port` | Change port location |
+
+### Status Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_port_status` | Check if port is online |
+| `get_port_ip` | Get current public IP |
+| `ping_port` | Test connectivity and latency |
+| `speed_test_port` | Measure download/upload speed |
+
+### Rotation Tools
+
+| Tool | Description |
+|------|-------------|
+| `rotate_port` | Rotate to new IP |
+| `check_rotation_availability` | Check if rotation is available |
+| `configure_auto_rotation` | Set up automatic rotation |
+| `get_rotation_history` | View rotation history |
+| `get_rotation_token_url` | Get public rotation URL |
+
+### Billing Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_pricing` | Get current pricing with volume discounts and slot tiers |
+| `calculate_price` | Calculate price for a specific GB amount with volume discounts |
+| `purchase_shared_traffic` | Buy shared traffic in GB ($4/GB base). Auto-upgrades slot tier! |
+
+### Crypto Payment Tools
+
+| Tool | Description |
+|------|-------------|
+| `create_crypto_payment` | Create crypto payment order ($10-$1000) |
+| `check_crypto_payment_status` | Check payment status by order ID |
+| `get_pending_crypto_payments` | List all pending payments |
+| `cancel_crypto_payment` | Cancel a pending payment |
+| `get_crypto_payment_info` | Supported currencies info |
+
+Supported: BTC, ETH, USDT, USDC, LTC, DOGE, TRX, XRP, ADA, SOL, MATIC, AVAX, DOT, LINK, UNI, SHIB, and 50+ more.
+
+### Reference Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_available_countries` | List available countries with live device counts |
+
+### Utility Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_proxy_connection_string` | Generate connection string |
+| `get_all_proxy_formats` | Get all proxy formats |
+| `get_os_fingerprint_options` | List OS fingerprint options |
+
+### Support Tools
+
+| Tool | Description |
+|------|-------------|
+| `create_support_ticket` | Submit a ticket to contact human support |
+| `list_my_tickets` | List all your support tickets |
+| `get_ticket` | Get ticket details with conversation history |
+| `reply_to_ticket` | Reply to an existing ticket |
+| `close_ticket` | Close a resolved ticket |
+
+### Pool Gateway Tools
+
+For resellers and gateway users: check stock, build proxy URLs with the username token DSL, and manage Pool Access Keys (`pak_`). Minting/listing/topping-up keys requires a reseller-role API key.
+
+| Tool | Description |
+|------|-------------|
+| `pool_get_stock` | Live Pool Gateway availability - online endpoint counts per country (no auth needed) |
+| `pool_build_proxy_url` | Build a ready-to-use gateway proxy URL from a reseller proxyUsername + a customer `pak_` key via the username token DSL (pool/country/carrier/city/sid/rot). Pure local builder, no network call |
+| `pool_list_sessions` | List live Pool Gateway sessions (traffic stats, exit IP, country). Pass `pakId` to scope to one customer |
+| `pool_close_session` | Close one live gateway session by its sessionKey |
+| `pool_mint_key` | Mint a new Pool Access Key (`pak_`) for a customer. `trafficCapGB` null = unlimited within your pool; `qualityTier: "safe"` routes only premium (mbl) stock |
+| `pool_list_keys` | List your Pool Access Keys (masked) |
+| `pool_topup_key` | Top up a `pak_` key: add traffic cap and/or extend expiry (atomic) |
+
+### Ops Tools (Admin)
+
+For internal ops agents. These require an **admin API key with `ops:*` scopes** - they do nothing with a regular customer key. All write actions are capped, rate-limited, audit-logged, and require a reason; large credits go to human approval.
+
+| Tool | Description |
+|------|-------------|
+| `ops_get_user` | Customer 360 view: balance, gateway usage, ports, farmer note |
+| `ops_get_user_audit` | Recent ops-agent actions taken on a user |
+| `ops_reconcile_payments` | Read-only Stripe-vs-DB payment view for a user |
+| `ops_list_tickets` | List support tickets (admin view, optional status filter) |
+| `ops_reply_ticket` | Post an admin reply to a ticket, optionally emailing the customer |
+| `ops_set_slots` | Set a user's shared/private port slot limits (capped) |
+| `ops_credit_balance` | Credit a user's balance in USD (capped per-action + daily budget) |
+| `ops_email_user` | Send a personalized email to one user (hourly rate-capped) |
+| `ops_list_farmers` | List farmer AI notes (shared operational memory) |
+| `ops_get_farmer` | Farmer fleet funnel (total/online/verified/listed/routable) + AI note |
+| `ops_write_farmer_note` | Write/append a farmer AI note shared with future AI sessions |
+
+### X402 Session Management Tools
+
+For agents who purchase via x402 protocol. Use `X-Session-Token` header for authentication.
+
+| Tool | What It Does |
+|------|-------------|
+| `get_x402_session` | Retrieve full session details — all port credentials (host, http_port, socks_port, username, password), traffic used/remaining, expiration, active status. Uses your X-Session-Token from the purchase response. |
+| `list_x402_ports` | List every port in your session with online/offline status, current IP, and traffic consumed per port. |
+| `get_x402_port_status` | Check a single port's detailed status — online/offline, current public IP, traffic used, device info, and expiration time. |
+| `get_sessions_by_wallet` | List all sessions (active and expired) for your wallet address. Useful for recovering session tokens or reviewing history. |
+| `get_session_status` | Quick status check — is the session active, how much traffic remains, when does it expire. |
+| `replace_x402_port` | Replace an offline or broken port with a new one on a **different device**. Completely free, max 3 replacements per session. The failed device is excluded from selection. Use when your proxy stops working. |
+| `calculate_x402_topup` | Preview the cost of extending your session. Specify `addTrafficGB` and/or `addDurationSeconds`. Duration-only extensions are free ($0). Traffic costs $4/GB. |
+| `topup_x402_session` | Pay USDC to extend your session with more traffic or duration. Requires a new on-chain payment. All active ports in the session are automatically extended. Replay-protected (each tx hash can only be used once). |
+
+---
+
+## Peer Marketplace — Earn USDC
+
+AI agents can earn USDC by sharing their internet bandwidth as peer proxy nodes.
+
+> **Two prices, never confuse them.** Everywhere above, $4/GB is the SELL price — what you PAY to *use* a proxy. The rates below are the PAYOUT — what you EARN for *sharing* bandwidth. They are not the same number and should never be conflated.
+
+**Earnings by IP Type (PAYOUT — what you earn for sharing, net, no platform fee):**
+- Mobile IPs: **$1.80/GB** (AT&T, Verizon, T-Mobile, Vodafone)
+- Residential IPs: **$1.20/GB** (Comcast, Spectrum, Cox)
+- Datacenter IPs: **$0.30/GB** (AWS, GCP, Azure, VPNs)
+
+> Payout rates are configurable in admin settings (`system_settings` `peer_rates`) — these are current defaults, not a contractual guarantee. Check the live `earningsPerGB` field in the registration response for the rate at registration time.
+
+**How it works:**
+1. Register: `POST https://api.proxies.sx/v1/peer/agents/register`
+2. Get JWT token + device ID
+3. Connect to WebSocket relay: `wss://relay.proxies.sx` with `Sec-WebSocket-Protocol: token.{JWT}` header
+4. Route proxy_request messages through your connection
+5. Respond to heartbeat with heartbeat_ack
+6. Earn automatically per GB routed
+
+**Minimum payout:** $5.00 USDC on Solana
+**Full docs:** https://agents.proxies.sx/peer/skill.md
+
+---
+
+## Example Conversations
+
+### x402: Get a Proxy (Autonomous)
+
+```
+User: I need a US mobile proxy for web scraping
+
+Claude: [Uses x402_get_pricing to calculate cost]
+Claude: [Uses x402_get_proxy with country=US, duration=3600, traffic=1]
+
+I've purchased a US mobile proxy for 1 hour with 1GB traffic.
+Cost: $4.00 USDC (paid from your agent wallet on Base)
+
+Connection Details:
+  HTTP: http://x402_abc123:xyz789@tmcal1.ddns.net:8500
+  SOCKS5: socks5://x402_abc123:xyz789@tmcal1.ddns.net:5500
+
+Session ID: 695abc123...
+Expires: in 1 hour
+```
+
+### Check Account Status
+
+```
+User: What's my account status?
+Claude: [Uses get_account_summary]
+Your account balance is $45.00. You have 5/10 shared slots used and 2.5/10 GB traffic remaining.
+```
+
+### Create a Proxy Port
+
+```
+User: Create a new shared proxy in Germany
+Claude: [Uses list_available_countries to find Germany ID]
+Claude: [Uses create_port with countryId and type=shared]
+Port created! Here are your connection details:
+  HTTP: http://user123:pass456@proxy.example.com:8080
+  SOCKS5: socks5://user123:pass456@proxy.example.com:1080
+```
+
+### Rotate IP
+
+```
+User: Rotate the IP on my main proxy
+Claude: [Uses list_ports to find the port]
+Claude: [Uses rotate_port]
+IP rotated successfully! New IP: 185.123.xxx.xxx
+```
+
+### Top Up Balance with Crypto
+
+```
+User: I need to add $50 to my balance using crypto
+Claude: [Uses create_crypto_payment with amount=50]
+I've created a crypto payment order for $50. Here's your payment link:
+https://pay.coingate.com/invoice/abc123
+
+Supported: BTC, ETH, USDT, and 50+ more cryptocurrencies.
+Balance will be credited automatically once confirmed.
+```
+
+### x402: Check Session Status
+
+```
+User: How much traffic have I used on my session?
+Claude: [Uses get_x402_session with sessionToken]
+
+Your x402 session status:
+  Status: Active
+  Traffic: 0.35/1.0 GB used (35%)
+  Expires: in 45 minutes
+
+Ports:
+  - Proxy US-1: http://x402_abc:xyz@tmcal1.ddns.net:8500
+    Rotation URL: https://api.proxies.sx/rotate/tok_...
+```
+
+### Contact Human Support
+
+```
+User: I'm having issues with my proxy not connecting, can you open a ticket?
+Claude: [Uses create_support_ticket]
+
+I've created a support ticket for you:
+  Ticket ID: 695abc...
+  Subject: Proxy Connection Issues
+  Status: Open
+
+The Proxies.sx support team will respond as soon as possible.
+You can use `get_ticket` to check for updates.
+```
+
+---
+
+## API Endpoints
+
+### x402 Endpoints (No Auth Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/v1/x402/health` | Service health check |
+| GET/POST | `/v1/x402/pricing` | Get pricing info |
+| GET/POST | `/v1/x402/calculate` | Calculate cost |
+| GET/POST | `/v1/x402/proxy` | Purchase proxy (402 flow) |
+| GET | `/v1/x402/session/:id` | Get session by ID |
+| GET | `/v1/x402/session/tx/:txHash` | Get session by tx hash |
+| GET | `/v1/x402/sessions/wallet/:wallet` | List sessions by wallet |
+| GET | `/v1/x402/sessions/:id/status` | Get session status |
+
+### x402 Session Management (Session Token Auth)
+
+Use `X-Session-Token` header with the token from purchase response:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/x402/manage/session` | Get session details + ports |
+| GET | `/v1/x402/manage/session/credit` | Check remaining credit |
+| GET | `/v1/x402/manage/ports` | List all ports in session |
+| GET | `/v1/x402/manage/ports/:id/status` | Get detailed port status |
+| POST | `/v1/x402/manage/ports/recreate` | Recreate deleted port |
+| POST | `/v1/x402/manage/ports/replace` | Replace offline port (free, max 3) |
+| GET | `/v1/x402/manage/session/topup/calculate` | Preview top-up cost |
+| POST | `/v1/x402/manage/session/topup` | Pay to extend session |
+
+### API Key Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/ports` | List all ports |
+| POST | `/v1/ports` | Create port |
+| GET | `/v1/ports/:id` | Get port details |
+| DELETE | `/v1/ports/:id` | Delete port |
+| POST | `/v1/ports/:id/rotate` | Rotate port |
+| GET | `/v1/account` | Get account info |
+
+Full API documentation: [proxies.sx/docs](https://proxies.sx/docs)
+
+---
+
+## Development
 
 ```bash
-npx @proxies-sx/mcp-server          # zero-install (recommended)
-npm i -g @proxies-sx/mcp-server     # global → `proxies-sx-mcp`
-npm i @proxies-sx/mcp-server        # local dependency
+# Install dependencies
+npm install
+
+# Run in development mode
+npm run dev
+
+# Build for production
+npm run build
+
+# Run tests
+npm test
+
+# Lint code
+npm run lint
 ```
-
-From source:
-
-```bash
-git clone https://github.com/bolivian-peru/proxies-sx-mcp-server
-cd proxies-sx-mcp-server && npm install && npm run build && npm start
-```
-
-Verify: `npx @proxies-sx/mcp-server --version` (it should report **61 tools available**).
 
 ---
 
-## 🤝 Contributing &amp; support
+## Links
 
-Issues and PRs welcome. Need a human? Use the `create_support_ticket` tool, or reach the team at [client.proxies.sx](https://client.proxies.sx). Licensed **MIT**.
+### Proxies.sx
+- **Website**: [proxies.sx](https://proxies.sx) - Premium mobile 4G/5G proxy service
+- **Customer Portal**: [client.proxies.sx](https://client.proxies.sx) - Manage your proxies and account
+- **API Documentation**: [proxies.sx/docs](https://proxies.sx/docs) - Complete REST API reference
+- **MCP Integration**: [proxies.sx/mcp](https://proxies.sx/mcp) - AI agent integration guide
+- **x402 Payments**: [proxies.sx/x402](https://proxies.sx/x402) - Autonomous USDC payment protocol
+- **Support Tickets**: [client.proxies.sx/tickets](https://client.proxies.sx/tickets) - Get help from our team
 
-<div align="center"><sub>Built for the agent economy · <a href="https://proxies.sx">Proxies.sx</a></sub></div>
+### Contact & Support
+- **Email**: [maya@proxies.sx](mailto:maya@proxies.sx)
+- **Telegram**: [@proxies_sx](https://t.me/proxies_sx)
+
+### x402 Protocol
+- **x402 Specification**: [x402.org](https://x402.org) - HTTP 402 payment protocol
+- **x402 Registry**: [x402scan.com](https://x402scan.com) - Discover x402 services
+
+---
+
+## Troubleshooting
+
+### "Authentication required" Error
+
+This is **expected behavior** when no credentials are provided:
+
+```
+Failed to start MCP server: Authentication required. Set one of:
+  Mode 1 (API Key):
+    - PROXIES_API_KEY: Your API key from https://client.proxies.sx/account
+  Mode 2 (x402 Wallet):
+    - AGENT_WALLET_KEY: Your wallet private key for USDC payments
+```
+
+**Solution:** Provide authentication via environment variable:
+
+```bash
+# With API key
+PROXIES_API_KEY=psx_your_key npx @proxies-sx/mcp-server
+
+# With x402 wallet
+AGENT_WALLET_KEY=0x_your_private_key npx @proxies-sx/mcp-server
+```
+
+### Node.js ExperimentalWarning
+
+If you see this warning on Node.js 23+:
+
+```
+ExperimentalWarning: CommonJS module ... is loading ES Module ... using require()
+```
+
+**This is harmless** - it's a Node.js warning about ESM/CommonJS interop, not an error. To suppress:
+
+```bash
+NODE_NO_WARNINGS=1 npx @proxies-sx/mcp-server
+```
+
+### npm Install Fails
+
+If `npm install` fails:
+
+```bash
+# Clear npm cache
+npm cache clean --force
+
+# Try installing again
+npm install @proxies-sx/mcp-server
+
+# Or use a specific registry
+npm install @proxies-sx/mcp-server --registry https://registry.npmjs.org
+```
+
+### Package Not Found
+
+If you get "package not found" error:
+
+```bash
+# Check if package exists
+npm view @proxies-sx/mcp-server
+
+# Update npm
+npm install -g npm@latest
+
+# Try again
+npm install @proxies-sx/mcp-server
+```
+
+### Verify Package Integrity
+
+```bash
+# Check installed version
+npm list @proxies-sx/mcp-server
+
+# Verify package loads correctly
+node -e "require('@proxies-sx/mcp-server/dist/tools')" && echo "OK"
+
+# Check tool count (should be 55)
+node -e "console.log(require('@proxies-sx/mcp-server/dist/tools').allToolDefinitions.length)"
+```
+
+### Claude Desktop Not Detecting MCP Server
+
+1. Ensure config file is in correct location:
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+2. Verify JSON syntax is valid
+
+3. Restart Claude Desktop completely (quit and reopen)
+
+4. Check Claude Desktop logs for errors
+
+---
+
+## About Proxies.sx
+
+[Proxies.sx](https://proxies.sx) provides premium mobile 4G/5G proxy infrastructure for web scraping, ad verification, social media automation, and more. Our [MCP server](https://proxies.sx/mcp) enables seamless integration with AI assistants, and our [x402 protocol support](https://proxies.sx/x402) allows AI agents to autonomously purchase and manage proxies without human intervention.
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file.
+
+---
+
+Built with love by [Proxies.sx](https://proxies.sx)

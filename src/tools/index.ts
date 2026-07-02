@@ -16,6 +16,8 @@ import { utilityToolDefinitions, createUtilityToolHandlers, utilitySchemas } fro
 import { paymentToolDefinitions, createPaymentToolHandlers, paymentSchemas } from './payments.js';
 import { supportToolDefinitions, createSupportToolHandlers, supportSchemas } from './support.js';
 import { x402SessionToolDefinitions, createX402SessionToolHandlers, x402SessionSchemas } from './x402-session.js';
+import { opsToolDefinitions, createOpsToolHandlers, opsSchemas } from './ops.js';
+import { poolToolDefinitions, createPoolToolHandlers, poolSchemas } from './pool.js';
 
 // Export everything
 export * from './account.js';
@@ -28,6 +30,8 @@ export * from './utilities.js';
 export * from './payments.js';
 export * from './support.js';
 export * from './x402-session.js';
+export * from './ops.js';
+export * from './pool.js';
 
 /**
  * All tool definitions combined
@@ -43,6 +47,8 @@ export const allToolDefinitions = [
   ...paymentToolDefinitions,
   ...supportToolDefinitions,
   ...x402SessionToolDefinitions,
+  ...opsToolDefinitions,
+  ...poolToolDefinitions,
 ] as const;
 
 /**
@@ -59,6 +65,8 @@ export const allSchemas = {
   ...paymentSchemas,
   ...supportSchemas,
   ...x402SessionSchemas,
+  ...opsSchemas,
+  ...poolSchemas,
 } as const;
 
 /**
@@ -85,6 +93,8 @@ export function createAllToolHandlers(api: ProxiesApi, baseUrl: string): ToolHan
   const paymentHandlers = createPaymentToolHandlers(api);
   const supportHandlers = createSupportToolHandlers(api);
   const x402SessionHandlers = createX402SessionToolHandlers(api, baseUrl);
+  const opsHandlers = createOpsToolHandlers(api);
+  const poolHandlers = createPoolToolHandlers(api);
 
   return {
     // Account tools
@@ -117,7 +127,6 @@ export function createAllToolHandlers(api: ProxiesApi, baseUrl: string): ToolHan
     get_pricing: () => billingHandlers.get_pricing(),
     calculate_price: (args) => billingHandlers.calculate_price(args as Parameters<typeof billingHandlers.calculate_price>[0]),
     purchase_shared_traffic: (args) => billingHandlers.purchase_shared_traffic(args as Parameters<typeof billingHandlers.purchase_shared_traffic>[0]),
-    purchase_private_traffic: (args) => billingHandlers.purchase_private_traffic(args as Parameters<typeof billingHandlers.purchase_private_traffic>[0]),
 
     // Reference tools (cities, carriers, regions removed - 2026-01-03)
     list_available_countries: (args) => referenceHandlers.list_available_countries(args as Parameters<typeof referenceHandlers.list_available_countries>[0]),
@@ -150,6 +159,28 @@ export function createAllToolHandlers(api: ProxiesApi, baseUrl: string): ToolHan
     replace_x402_port: (args) => x402SessionHandlers.replace_x402_port(args as Parameters<typeof x402SessionHandlers.replace_x402_port>[0]),
     calculate_x402_topup: (args) => x402SessionHandlers.calculate_x402_topup(args as Parameters<typeof x402SessionHandlers.calculate_x402_topup>[0]),
     topup_x402_session: (args) => x402SessionHandlers.topup_x402_session(args as Parameters<typeof x402SessionHandlers.topup_x402_session>[0]),
+
+    // Ops-agent tools (admin-scoped, capped, audited)
+    ops_get_user: (args) => opsHandlers.ops_get_user(args as Parameters<typeof opsHandlers.ops_get_user>[0]),
+    ops_get_user_audit: (args) => opsHandlers.ops_get_user_audit(args as Parameters<typeof opsHandlers.ops_get_user_audit>[0]),
+    ops_reconcile_payments: (args) => opsHandlers.ops_reconcile_payments(args as Parameters<typeof opsHandlers.ops_reconcile_payments>[0]),
+    ops_list_tickets: (args) => opsHandlers.ops_list_tickets(args as Parameters<typeof opsHandlers.ops_list_tickets>[0]),
+    ops_reply_ticket: (args) => opsHandlers.ops_reply_ticket(args as Parameters<typeof opsHandlers.ops_reply_ticket>[0]),
+    ops_set_slots: (args) => opsHandlers.ops_set_slots(args as Parameters<typeof opsHandlers.ops_set_slots>[0]),
+    ops_credit_balance: (args) => opsHandlers.ops_credit_balance(args as Parameters<typeof opsHandlers.ops_credit_balance>[0]),
+    ops_email_user: (args) => opsHandlers.ops_email_user(args as Parameters<typeof opsHandlers.ops_email_user>[0]),
+    ops_list_farmers: (args) => opsHandlers.ops_list_farmers(args as Parameters<typeof opsHandlers.ops_list_farmers>[0]),
+    ops_get_farmer: (args) => opsHandlers.ops_get_farmer(args as Parameters<typeof opsHandlers.ops_get_farmer>[0]),
+    ops_write_farmer_note: (args) => opsHandlers.ops_write_farmer_note(args as Parameters<typeof opsHandlers.ops_write_farmer_note>[0]),
+
+    // Pool Gateway tools (flagship one-port product)
+    pool_get_stock: () => poolHandlers.pool_get_stock(),
+    pool_build_proxy_url: (args) => poolHandlers.pool_build_proxy_url(args as Parameters<typeof poolHandlers.pool_build_proxy_url>[0]),
+    pool_list_sessions: (args) => poolHandlers.pool_list_sessions(args as Parameters<typeof poolHandlers.pool_list_sessions>[0]),
+    pool_close_session: (args) => poolHandlers.pool_close_session(args as Parameters<typeof poolHandlers.pool_close_session>[0]),
+    pool_mint_key: (args) => poolHandlers.pool_mint_key(args as Parameters<typeof poolHandlers.pool_mint_key>[0]),
+    pool_list_keys: () => poolHandlers.pool_list_keys(),
+    pool_topup_key: (args) => poolHandlers.pool_topup_key(args as Parameters<typeof poolHandlers.pool_topup_key>[0]),
   };
 }
 

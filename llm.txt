@@ -37,7 +37,7 @@ npx @proxies-sx/mcp-server
 - Agents pay directly with crypto - no signup required
 - Uses HTTP 402 Payment Required protocol
 
-## Available Tools (61 Total)
+## Available Tools (72 Total)
 
 ### Account Management
 - `get_account_summary` - Balance, slots, traffic usage
@@ -66,10 +66,9 @@ npx @proxies-sx/mcp-server
 - `get_rotation_token_url` - Get public rotation URL
 
 ### Billing & Purchases
-- `get_pricing` - Current pricing ($4/GB, metered) and volume discounts
+- `get_pricing` - Current pricing tiers and volume discounts
 - `calculate_price` - Calculate price with volume discounts for a specific GB amount
-- `purchase_shared_traffic` - Buy traffic in GB ($4/GB, metered)
-- `purchase_private_traffic` - Legacy buy-GB tool (still accepted by the API; metered $4/GB)
+- `purchase_shared_traffic` - Buy shared traffic in GB ($4/GB base)
 
 ### Crypto Payments
 - `create_crypto_payment` - Create CoinGate order ($10-$1000)
@@ -82,8 +81,42 @@ npx @proxies-sx/mcp-server
 ### Reference Data
 - `list_available_countries` - Available countries with live device counts
 
+### Utilities
+- `get_proxy_connection_string` - Generate a ready-to-use connection string for a port
+- `get_all_proxy_formats` - Get all proxy URL formats (curl, Python, env vars)
+- `get_os_fingerprint_options` - List available OS fingerprint values
+
+### Support Tickets
+- `create_support_ticket` - Submit a ticket to contact human support
+- `list_my_tickets` - List all your support tickets
+- `get_ticket` - Get ticket details with conversation history
+- `reply_to_ticket` - Reply to an existing ticket
+- `close_ticket` - Close a resolved ticket
+
+### Pool Gateway (reseller / gateway access)
+- `pool_get_stock` - Live Pool Gateway availability: online endpoint counts per country (no auth)
+- `pool_build_proxy_url` - Build a gateway proxy URL from a proxyUsername + pak_ key via the username token DSL (pure local, no network)
+- `pool_list_sessions` - List live Pool Gateway sessions (traffic, exit IP, country); pakId scopes to one customer
+- `pool_close_session` - Close one live gateway session by sessionKey
+- `pool_mint_key` - Mint a new Pool Access Key (pak_) for a customer (reseller role required)
+- `pool_list_keys` - List your Pool Access Keys (masked)
+- `pool_topup_key` - Add traffic cap and/or extend expiry on a pak_ key (atomic)
+
+### Ops (admin/ops agents - requires admin API key with ops:* scopes; capped + audited)
+- `ops_get_user` - Customer 360 view: balance, gateway usage, ports, farmer note
+- `ops_get_user_audit` - Recent ops-agent actions taken on a user
+- `ops_reconcile_payments` - Read-only Stripe-vs-DB payment view for a user
+- `ops_list_tickets` - List support tickets (admin view)
+- `ops_reply_ticket` - Post an admin reply to a ticket (reason required)
+- `ops_set_slots` - Set a user's port slot limits (capped, reason required)
+- `ops_credit_balance` - Credit a user's balance in USD (capped + daily budget; large amounts go to human approval)
+- `ops_email_user` - Send a personalized email to one user (rate-capped, reason required)
+- `ops_list_farmers` - List farmer AI notes (shared operational memory)
+- `ops_get_farmer` - Farmer fleet funnel (total/online/verified/listed/routable) + AI note
+- `ops_write_farmer_note` - Write/append a farmer AI note shared with future AI sessions
+
 ### x402 Tools (Autonomous Mode)
-- `x402_get_proxy` - Purchase a dedicated proxy with USDC ($4/GB, metered)
+- `x402_get_proxy` - Purchase proxy with USDC
 - `x402_get_pricing` - Calculate cost
 - `x402_wallet_balance` - Check wallet balance
 - `x402_list_sessions` - List active sessions
@@ -92,18 +125,8 @@ npx @proxies-sx/mcp-server
 - `x402_list_countries` - Available countries
 - `x402_list_cities` - Cities in a country
 - `x402_list_carriers` - Carriers in a country
+- `x402_extend_session` - Add more traffic/time
 - `x402_service_status` - Health check
-(To extend a dedicated-port session use `calculate_x402_topup` / `topup_x402_session`.)
-
-### x402 Pool Gateway Access (Autonomous Mode)
-One credential reaches every country in your tier via the username DSL. v1 tier = `mbl` ($4/GB, production modems, HTTP port 7000).
-- `x402_get_pool_access` - Buy Pool Gateway access with USDC (caches the session token)
-- `x402_pool_credit` - Remaining GB on the pool session (cached token if omitted)
-- `x402_pool_topup` - Pay USDC for more GB (duration-only is free)
-- `x402_pool_regenerate` - Rotate the credential secret (same username, new password)
-- `x402_pool_connection` - Re-emit credentials (recovery)
-- `x402_pool_pricing` - Tier catalog + username DSL (no auth)
-- `get_pool_stock` - Public online endpoint counts per country (no IPs)
 
 ### x402 Session Management
 - `get_x402_session` - Session details by token
@@ -124,17 +147,11 @@ One credential reaches every country in your tier via the username DSL. v1 tier 
 
 ## Pricing
 
-Duration is always FREE — you only pay for traffic. Per-GB metered only.
+Duration is always FREE — you only pay for traffic.
 
-### Metered
+### Shared
 - Traffic: $4.00/GB
 - Min purchase: 0.1 GB ($0.40)
-- The legacy private/dedicated ($8/GB) tier was removed; the platform is metered-only now.
-
-### Pool Gateway access (x402)
-- Tier `mbl`: $4.00/GB, production ProxySmart modems, HTTP proxy on port 7000
-- One credential reaches every country in your tier via the username DSL (psx_xxx-mbl-us, -mbl-de, ...)
-- Buy with `x402_get_pool_access`; catalog via `GET /v1/x402/pool/pricing`
 
 ## x402 Payment Flow
 
@@ -158,7 +175,7 @@ Duration is always FREE — you only pay for traffic. Per-GB metered only.
 User: I need a US mobile proxy for web scraping
 Agent: [Uses x402_get_pricing, x402_get_proxy]
 
-Purchased proxy for 0.40 USDC (0.1 GB shared):
+Purchased proxy for 0.40 USDC (0.1 GB):
 HTTP: http://x402_abc:xyz@tmcal1.ddns.net:8500
 SOCKS5: socks5://x402_abc:xyz@tmcal1.ddns.net:5500
 ```
@@ -191,17 +208,11 @@ IP rotated successfully! New IP: 185.123.xxx.xxx
 | POST /v1/ports | Create port |
 | POST /v1/ports/:id/rotate | Rotate IP |
 | GET /v1/account | Account summary |
-| GET/POST /v1/x402/proxy | Purchase dedicated proxy (402 flow) |
+| GET/POST /v1/x402/proxy | Purchase (402 flow) |
 | GET /v1/x402/countries | Available countries |
 | POST /v1/x402/manage/ports/replace | Replace offline port (free, max 3) |
 | GET /v1/x402/manage/session/topup/calculate | Preview top-up cost |
 | POST /v1/x402/manage/session/topup | Pay to extend session |
-| GET /v1/x402/pool/pricing | Pool Gateway tier catalog (no auth) |
-| GET/POST /v1/x402/pool | Buy Pool Gateway access (402 flow) |
-| GET /v1/x402/manage/pool/credit | Remaining pool GB (X-Session-Token) |
-| POST /v1/x402/manage/pool/topup | Pay USDC for more pool GB |
-| POST /v1/x402/manage/pool/regenerate | Rotate pool credential secret |
-| GET /v1/gateway/pool/stock | Public pool stock (counts per country, no IPs) |
 
 ## Links
 

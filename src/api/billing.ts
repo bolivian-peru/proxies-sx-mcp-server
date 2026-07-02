@@ -33,7 +33,7 @@ export class BillingApi {
 
   /**
    * Get complete pricing information including:
-   * - Base prices ($4/GB, metered; legacy private/dedicated tier removed)
+   * - Base price ($4/GB)
    * - Volume discounts (10%, 20%, 30%, 40% based on purchase amount)
    * - Slot tiers (Starter, Bronze, Silver, Gold, Platinum, Enterprise)
    * - Current user's tier info

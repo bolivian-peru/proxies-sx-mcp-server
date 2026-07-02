@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
-    "prepublishOnly": "npm run build"
+    "check:sync": "node ../agents-landing/scripts/check-manifest-sync.mjs",
+    "prepublishOnly": "npm run build && npm run check:sync"
   },
   "keywords": [
     "mcp",

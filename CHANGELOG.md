@@ -1,44 +1,21 @@
 # Changelog
 
-## 2.1.0 (2026-06-12)
+## 2.1.0 (2026-05-26)
 
-### Added — x402 Pool Gateway Access (the new product)
-Wallet-only agents can now buy **Pool Gateway access** with USDC, not just a single dedicated port. One credential reaches **every country in your tier** via the username DSL (`psx_xxx-mbl-us`, `-mbl-de`, …). v1 tier = `mbl` ($4/GB, metered, production ProxySmart modems), HTTP proxy on port 7000.
+### Added
+- **Pool Gateway tool group (7):** `pool_get_stock`, `pool_build_proxy_url` (in-tool DSL builder — no SDK import), `pool_list_sessions`, `pool_close_session`, `pool_mint_key`, `pool_list_keys`, `pool_topup_key`. Makes the flagship one-port product agent-native.
+- **Ops agent tool group (11):** `ops_get_user`, `ops_get_user_audit`, `ops_reconcile_payments`, `ops_list_tickets`, `ops_reply_ticket`, `ops_set_slots`, `ops_credit_balance`, `ops_email_user`, `ops_list_farmers`, `ops_get_farmer`, `ops_write_farmer_note`. Scoped (`ops:*`), capped, audited. Requires an admin-minted ops key.
+- `check:sync` script + CI guard validating the tool count against `docs-manifest.json`.
 
-Seven new tools (all in x402 autonomous mode):
-- `x402_get_pool_access` — buy pool access with USDC (402 → pay → retry), caches the returned session token
-- `x402_pool_credit` — remaining GB for a pool session (cached token if omitted)
-- `x402_pool_topup` — pay USDC for more GB (duration-only is free)
-- `x402_pool_regenerate` — rotate the credential secret (same username, new pak password)
-- `x402_pool_connection` — re-emit credentials (recovery)
-- `x402_pool_pricing` — tier catalog (no auth, no wallet)
-- `get_pool_stock` — public online endpoint counts per country (no IPs)
-
-### Fixed
-- **`x402_extend_session` removed.** It called `POST /x402/sessions/:id/extend`, which does not exist. The existing `topup_x402_session` already correctly hits the real route (`POST /x402/manage/session/topup` with `X-Session-Token` + `Payment-Signature`), so the broken duplicate was deleted (definition + zod + handler + client `extendSession` method).
-- Pool client methods correctly prefix `/v1` even when the MCP server is constructed with the bare `https://api.proxies.sx` base URL.
-
-### Changed — pricing corrected to metered-only
-- The platform is **per-GB metered only at $4/GB**; the legacy `$8/GB` private/dedicated tier was removed. Corrected every stale `$8` / private pricing claim in tool descriptions, schemas (`tier` enum is now `shared` only for x402 proxy tools), the pricing-display handler, billing tool descriptions, and all docs (README, SKILL.md, llm.txt, CLAUDE.md). `calculate_price` / `purchase_private_traffic` keep working (the API still accepts `isPrivate`), but are documented honestly — price is computed server-side.
-
-### Tooling
-- Tool count: **61** (44 API-key + 17 x402 autonomous). Was 55.
-
-## 2.0.1 (2026-04-30)
-
-### Docs
-- Added `SKILL.md` in [Anthropic skill format](https://github.com/anthropics/skills) — drops directly into Claude Code, Cursor, Windsurf, etc. as a triggerable skill that produces correct setup configs and tool selection for any user intent
-- README: removed specific peer rate dollar amounts (rates are platform-configurable, fetch live values from `get_pricing` / `x402_get_pricing` tools)
-- GitHub repo metadata set: description, homepage, topics
-
+### Notes
+- Total tools: 55 → **72** (61 api-key + 11 x402).
 
 ## 2.0.0 (2026-02-08)
 
 ### Breaking
-- **Tier names changed:** `dedicated` and `premium` removed. Use `shared` or `private` only
+- **Tier names changed:** `dedicated` and `premium` removed. Use `shared` only
 - **Pricing model updated:** Duration is now FREE. You only pay for traffic:
   - Shared: $4.00/GB
-  - Private: $8.00/GB (exclusive device)
   - Was: $0.03/hr+$3.50/GB (shared), $0.10/hr+$3.00/GB (dedicated), $0.25/hr+$2.50/GB (premium)
 - `x402_get_pricing` no longer accepts `duration_hours` parameter (duration is free)
 
