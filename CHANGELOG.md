@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.2.0 (2026-07-02)
+
+### Fixed
+- **`x402_extend_session` now works.** It previously called `POST /x402/sessions/:id/extend`, a route that does not exist on the backend, so every extend attempt in 2.1.0 (and earlier) failed. It now uses the real route: `POST /v1/x402/manage/session/topup` with the `X-Session-Token` header and `{ addDurationSeconds }`. Duration-only top-ups are FREE on the backend, so the tool no longer sends any USDC. The public input schema is unchanged (`session_id`, `additional_hours`); `session_id` also accepts the `x402s_` session token from the purchase response directly.
+- Session cache now stores the manage session token (`x402s_...`) from purchase responses so follow-up manage calls work without re-entering it.
+
+### Added
+- **x402 Pool Gateway tool group (7, wallet-side):** `x402_get_pool_access`, `x402_pool_credit`, `x402_pool_topup`, `x402_pool_regenerate`, `x402_pool_connection`, `x402_pool_pricing`, `get_pool_stock`. A wallet-only agent can buy Pool Gateway access with USDC (Base or Solana) and get ONE credential that reaches every country in its tier via the username DSL (v1 tier `mbl`, $4/GB metered, HTTP :7000). All endpoints validated against the live backend (`/v1/x402/pool*`, `/v1/x402/manage/pool/*`, `/v1/gateway/pool/stock`).
+- Pool session token is cached locally (`~/.proxies-sx/x402-pool-token.json`) so the manage tools work without passing the token each call.
+
+### Changed
+- `check:sync` is now tolerant when run outside the monorepo (standalone GitHub clones): it skips gracefully with a message when `../agents-landing` is not present, and still runs the strict check inside the monorepo.
+
+### Notes
+- Total tools: 72 -> **79** (61 api-key + 18 x402).
+
 ## 2.1.0 (2026-05-26)
 
 ### Added

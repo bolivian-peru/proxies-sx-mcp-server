@@ -37,7 +37,7 @@ npx @proxies-sx/mcp-server
 - Agents pay directly with crypto - no signup required
 - Uses HTTP 402 Payment Required protocol
 
-## Available Tools (72 Total)
+## Available Tools (79 Total)
 
 ### Account Management
 - `get_account_summary` - Balance, slots, traffic usage
@@ -125,8 +125,17 @@ npx @proxies-sx/mcp-server
 - `x402_list_countries` - Available countries
 - `x402_list_cities` - Cities in a country
 - `x402_list_carriers` - Carriers in a country
-- `x402_extend_session` - Add more traffic/time
+- `x402_extend_session` - Extend session duration for FREE (duration-only top-up via /v1/x402/manage/session/topup; accepts session ID or x402s_ token)
 - `x402_service_status` - Health check
+
+### x402 Pool Gateway (wallet-only, one credential for every country in your tier)
+- `x402_get_pool_access` - Buy Pool Gateway access with USDC (one credential, username DSL, HTTP :7000, mbl tier $4/GB)
+- `x402_pool_credit` - Check remaining pool credit (GB) for a pool session
+- `x402_pool_topup` - Add GB (paid, $4/GB) and/or duration (free) to a pool session
+- `x402_pool_regenerate` - Rotate the pool credential secret (same username, new password)
+- `x402_pool_connection` - Re-emit pool proxy credentials (recovery)
+- `x402_pool_pricing` - Pool Gateway tier catalog (no auth, no wallet)
+- `get_pool_stock` - Public pool stock: online endpoint counts per country, no IPs (no auth)
 
 ### x402 Session Management
 - `get_x402_session` - Session details by token

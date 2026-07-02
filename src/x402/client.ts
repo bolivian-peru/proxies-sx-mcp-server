@@ -12,6 +12,10 @@ import type {
   X402ProxyResponse,
   X402Session,
   X402Pricing,
+  X402TopupResult,
+  X402PoolResponse,
+  X402PoolCredit,
+  X402PoolPricing,
 } from './types.js';
 
 /**
@@ -39,6 +43,15 @@ export class X402Client {
     this.wallet = wallet;
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.preferredNetwork = preferredNetwork;
+  }
+
+  /**
+   * Resolve the API base that always includes the `/v1` prefix.
+   * The MCP server constructs this client with `https://api.proxies.sx`
+   * (no `/v1`), so versioned routes must add it explicitly.
+   */
+  private v1Base(): string {
+    return /\/v1$/.test(this.baseUrl) ? this.baseUrl : `${this.baseUrl}/v1`;
   }
 
   /**
@@ -299,52 +312,291 @@ export class X402Client {
   }
 
   /**
-   * Extend a session by paying more USDC
+   * Extend a session's duration via the real top-up route.
+   * Duration-only top-ups are FREE on the backend, so no USDC is sent.
+   *
+   * Route: POST /v1/x402/manage/session/topup
+   * Auth:  X-Session-Token: x402s_...
+   * Note:  the backend requires a non-empty Payment-Signature header even
+   *        for $0 duration-only top-ups; the value is ignored when cost is 0.
    */
   async extendSession(
-    sessionId: string,
+    sessionToken: string,
     additionalHours: number
-  ): Promise<X402Session> {
-    // First get current session to verify it exists
-    await this.getSessionStatus(sessionId);
+  ): Promise<X402TopupResult> {
+    const addDurationSeconds = Math.round(additionalHours * 3600);
 
-    // Calculate extension cost (just time, no additional traffic)
-    const url = new URL(`${this.baseUrl}/x402/sessions/${sessionId}/extend`);
-    url.searchParams.set('hours', String(additionalHours));
+    const response = await fetch(`${this.v1Base()}/x402/manage/session/topup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Session-Token': sessionToken,
+        // Required non-empty by the backend; unused for free duration-only top-ups
+        'Payment-Signature': 'duration-only',
+      },
+      body: JSON.stringify({ addDurationSeconds }),
+    });
 
-    // Get payment requirement for extension
-    const response = await fetch(url.toString(), { method: 'POST' });
-
-    if (response.status !== 402) {
-      throw new Error(`Expected 402 for extension, got ${response.status}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
+      throw new Error(
+        `Failed to extend session (${response.status}): ${error.message || 'Unknown error'}`
+      );
     }
 
-    const extensionData = await response.json() as { paymentRequirement: X402PaymentRequirement };
-    const paymentOption = this.findPaymentOption(extensionData.paymentRequirement);
+    return response.json() as Promise<X402TopupResult>;
+  }
 
-    // Pay for extension
+  // ============ Pool Gateway Access ============
+
+  /**
+   * Get the Pool Gateway tier catalog (no auth, no wallet needed)
+   */
+  async getPoolPricing(): Promise<X402PoolPricing> {
+    const response = await fetch(`${this.v1Base()}/x402/pool/pricing`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pool pricing: ${response.status}`);
+    }
+    return response.json() as Promise<X402PoolPricing>;
+  }
+
+  /**
+   * Buy Pool Gateway access via x402 payment.
+   * Flow: GET /v1/x402/pool (402 catalog) -> pay USDC on-chain -> retry with Payment-Signature.
+   */
+  async purchasePoolAccess(params: {
+    country?: string;
+    trafficGB?: number;
+    tier?: string;
+    sid?: string;
+    rot?: string;
+  }): Promise<X402PoolResponse> {
+    const trafficGB = params.trafficGB || 1;
+    const tier = params.tier || 'mbl';
+
+    const url = new URL(`${this.v1Base()}/x402/pool`);
+    url.searchParams.set('tier', tier);
+    if (params.country) url.searchParams.set('country', params.country);
+    url.searchParams.set('traffic', String(trafficGB));
+    if (params.sid) url.searchParams.set('sid', params.sid);
+    if (params.rot) url.searchParams.set('rot', params.rot);
+
+    // Step 1: Get 402 payment requirement (the 402 IS the catalog)
+    const initial = await fetch(url.toString());
+    if (initial.status !== 402) {
+      // Some configs may provision directly; if already 2xx, return it
+      if (initial.ok) {
+        return initial.json() as Promise<X402PoolResponse>;
+      }
+      const body = await initial.text();
+      throw new Error(`Expected 402 Payment Required, got ${initial.status}: ${body}`);
+    }
+
+    const data = await initial.json() as { paymentRequirement?: X402PaymentRequirement };
+    if (!data.paymentRequirement) {
+      throw new Error('Missing paymentRequirement in 402 pool response');
+    }
+
+    // Step 2: Pick a payment option for our network
+    const paymentOption = this.findPaymentOption(data.paymentRequirement);
+
+    // Step 3: Ensure sufficient balance
+    const hasBalance = await this.wallet.hasSufficientBalance(paymentOption.maxAmountRequired);
+    if (!hasBalance) {
+      const balance = await this.wallet.getBalance();
+      const required = Number(paymentOption.maxAmountRequired) / 1e6;
+      throw new Error(
+        `Insufficient USDC balance. Required: $${required.toFixed(2)}, Available: ${balance.formatted}. ` +
+        `Please top up wallet: ${this.wallet.address}`
+      );
+    }
+
+    // Step 4: Pay USDC on-chain
     const transfer = await this.wallet.sendUSDC(
       paymentOption.payTo,
       paymentOption.maxAmountRequired
     );
 
-    // Submit payment proof
-    const extendResponse = await fetch(url.toString(), {
-      method: 'POST',
-      headers: {
-        'X-Payment': JSON.stringify({
-          transactionHash: transfer.transactionHash,
-          network: transfer.network,
-          payer: this.wallet.address,
-        }),
-      },
+    // Step 5: Retry with Payment-Signature header
+    const paid = await fetch(url.toString(), {
+      headers: { 'Payment-Signature': transfer.transactionHash },
     });
 
-    if (!extendResponse.ok) {
-      throw new Error('Failed to extend session');
+    if (!paid.ok) {
+      const error = await paid.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
+      throw new Error(
+        `Pool access provisioning failed (${paid.status}): ${error.message || JSON.stringify(error)}`
+      );
     }
 
-    return extendResponse.json() as Promise<X402Session>;
+    return paid.json() as Promise<X402PoolResponse>;
+  }
+
+  /**
+   * Read remaining pool credit (pak-backed) for a session token
+   */
+  async getPoolCredit(sessionToken: string): Promise<X402PoolCredit> {
+    const response = await fetch(`${this.v1Base()}/x402/manage/pool/credit`, {
+      headers: { 'X-Session-Token': sessionToken },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
+      throw new Error(`Failed to fetch pool credit (${response.status}): ${error.message || 'Unknown error'}`);
+    }
+    return response.json() as Promise<X402PoolCredit>;
+  }
+
+  /**
+   * Re-emit the pool proxy credentials (recovery)
+   */
+  async getPoolConnection(sessionToken: string): Promise<X402PoolResponse> {
+    const response = await fetch(`${this.v1Base()}/x402/manage/pool/connection`, {
+      headers: { 'X-Session-Token': sessionToken },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
+      throw new Error(`Failed to fetch pool connection (${response.status}): ${error.message || 'Unknown error'}`);
+    }
+    return response.json() as Promise<X402PoolResponse>;
+  }
+
+  /**
+   * Get per-day usage (MB) for a pool session
+   */
+  async getPoolUsage(sessionToken: string, days?: number): Promise<{ tier?: string; days?: number; usage: Array<{ date: string; mb: number }> }> {
+    const url = new URL(`${this.v1Base()}/x402/manage/pool/usage`);
+    if (days) url.searchParams.set('days', String(days));
+    const response = await fetch(url.toString(), {
+      headers: { 'X-Session-Token': sessionToken },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
+      throw new Error(`Failed to fetch pool usage (${response.status}): ${error.message || 'Unknown error'}`);
+    }
+    return response.json() as Promise<{ tier?: string; days?: number; usage: Array<{ date: string; mb: number }> }>;
+  }
+
+  /**
+   * Top up a pool session with more GB and/or duration.
+   * Duration-only is free; traffic requires an on-chain payment + Payment-Signature.
+   */
+  async topUpPool(
+    sessionToken: string,
+    params: { addTrafficGB?: number; addDurationSeconds?: number }
+  ): Promise<X402PoolCredit> {
+    const body: Record<string, number> = {};
+    if (params.addTrafficGB) body.addTrafficGB = params.addTrafficGB;
+    if (params.addDurationSeconds) body.addDurationSeconds = params.addDurationSeconds;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Session-Token': sessionToken,
+    };
+
+    // Paid top-up (traffic): ask the route for its 402 quote (authoritative,
+    // priced at the session's frozen mint-time rate), pay USDC, then retry
+    // with the Payment-Signature attached.
+    if (params.addTrafficGB && params.addTrafficGB > 0) {
+      const quoteRes = await fetch(`${this.v1Base()}/x402/manage/pool/topup`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      if (quoteRes.status !== 402) {
+        // No payment demanded (or a hard error) - surface it directly
+        if (quoteRes.ok) {
+          return quoteRes.json() as Promise<X402PoolCredit>;
+        }
+        const error = await quoteRes.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
+        throw new Error(`Pool top-up failed (${quoteRes.status}): ${error.message || 'Unknown error'}`);
+      }
+
+      const quoteBody = await quoteRes.json() as {
+        paymentRequirement?: X402PaymentRequirement & { amountUSDC?: number };
+      };
+      const requirement = quoteBody.paymentRequirement;
+
+      let payTo: string | undefined;
+      let amountMicro: string | undefined;
+      if (requirement && Array.isArray(requirement.accepts) && requirement.accepts.length > 0) {
+        const option = this.findPaymentOption(requirement);
+        payTo = option.payTo;
+        // amountUSDC in the 402 body is the frozen session-tier price; prefer it
+        amountMicro = requirement.amountUSDC !== undefined
+          ? String(Math.ceil(Number(requirement.amountUSDC) * 1e6))
+          : option.maxAmountRequired;
+      }
+
+      // Fallback: derive from the public catalog if the 402 was not parseable
+      if (!payTo || !amountMicro) {
+        const pricing = await this.getPoolPricing();
+        const tiers = pricing.tiers || [];
+        const tierEntry = tiers.find((t) => t.tier === pricing.defaultTier) || tiers[0];
+        const pricePerGB = tierEntry?.pricePerGB ?? 4;
+        amountMicro = String(Math.ceil(params.addTrafficGB * pricePerGB * 1e6));
+        payTo = this.resolvePoolPayTo(pricing);
+        if (!payTo) {
+          throw new Error('Could not resolve pool top-up recipient address from /v1/x402/pool/pricing networks');
+        }
+      }
+
+      const transfer = await this.wallet.sendUSDC(payTo, amountMicro);
+      headers['Payment-Signature'] = transfer.transactionHash;
+    }
+
+    const response = await fetch(`${this.v1Base()}/x402/manage/pool/topup`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
+      throw new Error(`Pool top-up failed (${response.status}): ${error.message || 'Unknown error'}`);
+    }
+
+    return response.json() as Promise<X402PoolCredit>;
+  }
+
+  /**
+   * Rotate the pool credential secret (same username, new pak password)
+   */
+  async regeneratePool(sessionToken: string): Promise<X402PoolResponse> {
+    const response = await fetch(`${this.v1Base()}/x402/manage/pool/regenerate`, {
+      method: 'POST',
+      headers: { 'X-Session-Token': sessionToken },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
+      throw new Error(`Pool regenerate failed (${response.status}): ${error.message || 'Unknown error'}`);
+    }
+    return response.json() as Promise<X402PoolResponse>;
+  }
+
+  /**
+   * Resolve the on-chain recipient address for a pool top-up from the catalog networks.
+   * The backend's network entries carry `recipientAddress`; older shapes may use
+   * payTo/recipient/address, so all are accepted. Picks the entry matching the
+   * wallet's preferred network when present.
+   */
+  private resolvePoolPayTo(pricing: X402PoolPricing): string | undefined {
+    const networks = (pricing.networks || []) as Array<Record<string, unknown>>;
+    if (networks.length === 0) return undefined;
+    const wanted = this.preferredNetwork;
+    const match = networks.find((n) => String(n.network || '').toLowerCase() === wanted) || networks[0];
+    const addr = (match.recipientAddress || match.payTo || match.recipient || match.address) as string | undefined;
+    return addr;
+  }
+
+  /**
+   * Get public Pool Gateway stock (counts per country, no IPs)
+   */
+  async getPoolStock(): Promise<unknown> {
+    const response = await fetch(`${this.v1Base()}/gateway/pool/stock`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pool stock: ${response.status}`);
+    }
+    return response.json();
   }
 
   /**

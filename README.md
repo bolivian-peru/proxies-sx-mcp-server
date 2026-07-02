@@ -107,7 +107,7 @@ After installing, verify the package works:
 # Check version
 npm list @proxies-sx/mcp-server
 
-# Test loading (should show "72 tools available")
+# Test loading (should show "61 tools available" - the API-key set; 79 total with the 18 x402 wallet tools)
 node -e "const t = require('@proxies-sx/mcp-server/dist/tools'); console.log(t.allToolDefinitions.length + ' tools available')"
 ```
 
@@ -259,8 +259,22 @@ Available countries: **DE, PL, US, FR, ES, GB** (dynamic based on device availab
 | `x402_list_countries` | List countries where proxies are available with live device counts. Currently: DE, PL, US, FR, ES, GB. |
 | `x402_list_cities` | List available cities within a specific country. |
 | `x402_list_carriers` | List mobile carriers available in a country (e.g., AT&T, Verizon, T-Mobile for US). |
-| `x402_extend_session` | Add more traffic or extend duration on an existing session. Calculates cost and sends USDC payment automatically. Traffic: $4/GB. Duration extensions are free. |
+| `x402_extend_session` | Extend a session's duration for FREE (duration-only top-up, no USDC sent). Accepts a session ID or the x402s_ session token. All active ports in the session are extended. For more traffic (paid, $4/GB) use `topup_x402_session`. |
 | `x402_service_status` | Health check — verifies the x402 service is running and accepting payments. |
+
+### x402 Pool Gateway Tools (Detailed)
+
+Wallet-only Pool Gateway access: pay USDC, get ONE credential that reaches every country in your tier via the username DSL (e.g. `psx_xxx-mbl-us`, `-mbl-de`, ...). HTTP proxy on port 7000. v1 tier is `mbl` ($4/GB, metered, production ProxySmart modems).
+
+| Tool | What It Does |
+|------|-------------|
+| `x402_get_pool_access` | Buy Pool Gateway access with USDC (Base or Solana). Returns one credential valid for every country in the tier, plus a session token (cached locally) for the manage tools below. |
+| `x402_pool_credit` | Check remaining pool credit (allocated/used/remaining GB, enabled state, expiry). Uses the cached session token if none is provided. |
+| `x402_pool_topup` | Add GB (paid, $4/GB) and/or duration (FREE) to a pool session. Pays USDC automatically when traffic is added. |
+| `x402_pool_regenerate` | Rotate the pool credential secret (new password, same username). Use if the credential leaked. |
+| `x402_pool_connection` | Re-emit the full pool proxy credentials (host, port, username, password) for recovery. |
+| `x402_pool_pricing` | Get the Pool Gateway tier catalog: tiers, $/GB, min purchase, networks, and the username DSL. No auth or wallet needed. |
+| `get_pool_stock` | Public Pool Gateway stock: online endpoint counts per country (no IPs). No auth needed. |
 
 ---
 
@@ -680,7 +694,7 @@ npm list @proxies-sx/mcp-server
 # Verify package loads correctly
 node -e "require('@proxies-sx/mcp-server/dist/tools')" && echo "OK"
 
-# Check tool count (should be 55)
+# Check tool count (should be 61 - the API-key set; x402 wallet tools add 18 more for 79 total)
 node -e "console.log(require('@proxies-sx/mcp-server/dist/tools').allToolDefinitions.length)"
 ```
 

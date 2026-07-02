@@ -13,6 +13,7 @@ import type { CachedSession, SessionCacheData, ProxyCredentials, LocationInfo } 
  */
 const DEFAULT_CACHE_DIR = join(homedir(), '.proxies-sx');
 const DEFAULT_CACHE_FILE = 'x402-sessions.json';
+const POOL_TOKEN_FILE = 'x402-pool-token.json';
 
 /**
  * x402 Session Cache
@@ -104,6 +105,7 @@ export class X402SessionCache {
     };
     rotationUrl?: string;
     rotationToken?: string;
+    sessionToken?: string;
   }): void {
     const session: CachedSession = {
       id: response.session.id,
@@ -112,9 +114,23 @@ export class X402SessionCache {
       location: response.session.location,
       rotationUrl: response.rotationUrl || '',
       rotationToken: response.rotationToken || '',
+      sessionToken: response.sessionToken,
     };
 
     this.addSession(session);
+  }
+
+  /**
+   * Store the manage session token (x402s_...) for a cached session
+   */
+  setSessionToken(sessionId: string, sessionToken: string): boolean {
+    const session = this.cache.sessions.find((s) => s.id === sessionId);
+    if (session) {
+      session.sessionToken = sessionToken;
+      this.save();
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -278,6 +294,52 @@ export class X402SessionCache {
       lastUpdated: this.cache.lastUpdated,
       cachePath: this.cachePath,
     };
+  }
+
+  /**
+   * Path to the pool-token cache (sibling of the session cache file)
+   */
+  private get poolTokenPath(): string {
+    return join(dirname(this.cachePath), POOL_TOKEN_FILE);
+  }
+
+  /**
+   * Persist the most recent Pool Gateway session token for this wallet
+   */
+  setPoolToken(sessionToken: string): void {
+    try {
+      const dir = dirname(this.poolTokenPath);
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+      }
+      writeFileSync(
+        this.poolTokenPath,
+        JSON.stringify(
+          { walletAddress: this.walletAddress, sessionToken, updatedAt: new Date().toISOString() },
+          null,
+          2
+        )
+      );
+    } catch (error) {
+      console.error('Failed to save pool token:', error);
+    }
+  }
+
+  /**
+   * Read the cached Pool Gateway session token (if any) for this wallet
+   */
+  getPoolToken(): string | undefined {
+    try {
+      if (existsSync(this.poolTokenPath)) {
+        const data = JSON.parse(readFileSync(this.poolTokenPath, 'utf-8'));
+        if (data.walletAddress?.toLowerCase() === this.walletAddress && data.sessionToken) {
+          return data.sessionToken as string;
+        }
+      }
+    } catch {
+      // ignore parse/read errors
+    }
+    return undefined;
   }
 }
 

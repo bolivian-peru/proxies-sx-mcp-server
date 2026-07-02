@@ -164,6 +164,8 @@ export interface CachedSession {
   location: LocationInfo;
   rotationUrl: string;
   rotationToken: string;
+  /** Session token (x402s_...) used for X-Session-Token manage endpoints */
+  sessionToken?: string;
 }
 
 /**
@@ -186,4 +188,90 @@ export interface X402Pricing {
     trafficCost: number;
     trafficGB: number;
   };
+}
+
+/**
+ * Result of a session top-up / duration extension
+ * (POST /v1/x402/manage/session/topup)
+ */
+export interface X402TopupResult {
+  sessionId: string;
+  trafficAllocatedGB: number;
+  expiresAt: string;
+  payment?: {
+    txHash: string;
+    network: string;
+    amountUSDC: number;
+  };
+  ports?: Array<{ id: string; expiresAt: string }>;
+}
+
+/**
+ * Pool Gateway proxy block returned after purchase
+ * (GET|POST /v1/x402/pool -> { product, proxy, credit, sessionToken, ... })
+ */
+export interface X402PoolProxy {
+  host: string;
+  httpPort: number;
+  username: string;
+  password: string;
+  http?: string;
+  socks5?: string | null;
+  usernameTemplate?: string;
+  /** Backend returns an object: { tier, ipTypes, countries } */
+  allowed?: unknown;
+}
+
+/**
+ * Pool Gateway credit (pak-backed)
+ */
+export interface X402PoolCredit {
+  tier?: string;
+  allocatedGB: number;
+  usedGB: number;
+  remainingGB: number;
+  enabled: boolean;
+  expiresAt?: string;
+  sessionToken?: string;
+}
+
+/**
+ * Pool Gateway purchase response
+ */
+export interface X402PoolResponse {
+  product: 'pool';
+  proxy: X402PoolProxy;
+  credit: X402PoolCredit;
+  sessionToken: string;
+  manage?: Record<string, string>;
+  stockUrl?: string;
+  quality?: unknown;
+  caveats?: string[];
+  payment?: {
+    network: string;
+    txHash?: string;
+    amountUSDC?: string | number;
+  };
+}
+
+/**
+ * Pool Gateway tier catalog (no auth)
+ * (GET /v1/x402/pool/pricing)
+ */
+export interface X402PoolPricing {
+  product: 'pool';
+  tiers: Array<{
+    tier: string;
+    pricePerGB: number;
+    currency?: string;
+    minPurchaseGB?: number;
+    quality?: string;
+    [key: string]: unknown;
+  }>;
+  defaultTier?: string;
+  durationFree?: boolean;
+  maxDurationSeconds?: number;
+  stockUrl?: string;
+  usernameDsl?: string;
+  networks?: unknown[];
 }
