@@ -71,7 +71,7 @@ npx proxies-sx-mcp
 ### Option 4: From Source
 
 ```bash
-git clone https://github.com/proxies-sx/mcp-server.git
+git clone https://github.com/bolivian-peru/proxies-sx-mcp-server.git
 cd mcp-server
 npm install
 npm run build
@@ -107,7 +107,7 @@ After installing, verify the package works:
 # Check version
 npm list @proxies-sx/mcp-server
 
-# Test loading (should show "61 tools available" - the API-key set; 79 total with the 18 x402 wallet tools)
+# Test loading (should show "70 tools available" - the API-key set; 89 total with the 19 x402 wallet tools)
 node -e "const t = require('@proxies-sx/mcp-server/dist/tools'); console.log(t.allToolDefinitions.length + ' tools available')"
 ```
 
@@ -237,7 +237,7 @@ Duration is always **FREE** — you only pay for traffic.
 |------|------------|---------------|-------------|
 | **Shared** | FREE | **$4.00/GB** | 0.1 GB ($0.40) |
 
-Available countries: **DE, PL, US, FR, ES, GB** (dynamic based on device availability)
+Available countries (live, measured against `/v1/x402/countries`): **US, GB, FR, NL, PL, GE** (Georgia, not Germany — same 6 countries as the Pool Gateway `mbl` tier; dynamic based on device availability)
 
 ### Supported Networks
 
@@ -256,7 +256,7 @@ Available countries: **DE, PL, US, FR, ES, GB** (dynamic based on device availab
 | `x402_check_session` | Get detailed session info by ID — includes all port credentials, traffic stats, and expiration. Use this to retrieve your proxy details. |
 | `x402_wallet_balance` | Check your USDC balance on Base or Solana. Shows available funds and whether you have enough for a purchase. |
 | `x402_rotate_ip` | Rotate to a new IP address using the rotation token from your proxy purchase. Free, no payment needed. Returns the new IP. |
-| `x402_list_countries` | List countries where proxies are available with live device counts. Currently: DE, PL, US, FR, ES, GB. |
+| `x402_list_countries` | List countries where proxies are available with live device counts. Currently: US, GB, FR, NL, PL, GE (Georgia). |
 | `x402_list_cities` | List available cities within a specific country. |
 | `x402_list_carriers` | List mobile carriers available in a country (e.g., AT&T, Verizon, T-Mobile for US). |
 | `x402_extend_session` | Extend a session's duration for FREE (duration-only top-up, no USDC sent). Accepts a session ID or the x402s_ session token. All active ports in the session are extended. For more traffic (paid, $4/GB) use `topup_x402_session`. |
@@ -264,7 +264,7 @@ Available countries: **DE, PL, US, FR, ES, GB** (dynamic based on device availab
 
 ### x402 Pool Gateway Tools (Detailed)
 
-Wallet-only Pool Gateway access: pay USDC, get ONE credential that reaches every country in your tier via the username DSL (e.g. `psx_xxx-mbl-us`, `-mbl-de`, ...). HTTP proxy on port 7000. v1 tier is `mbl` ($4/GB, metered, production ProxySmart modems).
+Wallet-only Pool Gateway access: pay USDC, get ONE credential that reaches every country in your tier via the username DSL (e.g. `psx_xxx-mbl-us`, `-mbl-pl`, ...). HTTP proxy on port 7000. v1 tier is `mbl` ($4/GB, metered, production ProxySmart modems, 6 countries: US/GB/FR/NL/PL/GE).
 
 | Tool | What It Does |
 |------|-------------|
@@ -273,6 +273,7 @@ Wallet-only Pool Gateway access: pay USDC, get ONE credential that reaches every
 | `x402_pool_topup` | Add GB (paid, $4/GB) and/or duration (FREE) to a pool session. Pays USDC automatically when traffic is added. |
 | `x402_pool_regenerate` | Rotate the pool credential secret (new password, same username). Use if the credential leaked. |
 | `x402_pool_connection` | Re-emit the full pool proxy credentials (host, port, username, password) for recovery. |
+| `x402_pool_usage` | Get per-day bandwidth usage (MB) for a pool session over the last N days (default 30, max 365), gap-filled with zeroes. |
 | `x402_pool_pricing` | Get the Pool Gateway tier catalog: tiers, $/GB, min purchase, networks, and the username DSL. No auth or wallet needed. |
 | `get_pool_stock` | Public Pool Gateway stock: online endpoint counts per country (no IPs). No auth needed. |
 
@@ -364,17 +365,26 @@ Supported: BTC, ETH, USDT, USDC, LTC, DOGE, TRX, XRP, ADA, SOL, MATIC, AVAX, DOT
 
 ### Pool Gateway Tools
 
-For resellers and gateway users: check stock, build proxy URLs with the username token DSL, and manage Pool Access Keys (`pak_`). Minting/listing/topping-up keys requires a reseller-role API key.
+For resellers and gateway users: check stock, build proxy URLs with the username token DSL, manage your own pool credentials, and manage Pool Access Keys (`pak_`). Minting/listing/topping-up/updating/regenerating/revealing/deleting keys and reading their usage/audit requires a reseller-role API key.
 
 | Tool | Description |
 |------|-------------|
 | `pool_get_stock` | Live Pool Gateway availability - online endpoint counts per country (no auth needed) |
-| `pool_build_proxy_url` | Build a ready-to-use gateway proxy URL from a reseller proxyUsername + a customer `pak_` key via the username token DSL (pool/country/carrier/city/sid/rot). Pure local builder, no network call |
+| `pool_build_proxy_url` | Build a ready-to-use gateway proxy URL from a reseller proxyUsername + a customer `pak_` key via the username token DSL (pool/country/carrier/city/iptype/sid/rot). Pure local builder, no network call. `ipType` (`mobile`/`residential`/`datacenter`) hard-filters the `peer` pool to one exit class — `mbl` is mobile-only by construction so `ipType` only matters for `peer`/`any`/`best` |
 | `pool_list_sessions` | List live Pool Gateway sessions (traffic stats, exit IP, country). Pass `pakId` to scope to one customer |
 | `pool_close_session` | Close one live gateway session by its sessionKey |
+| `pool_get_my_credentials` | Get your own pool proxyUsername + ready-to-use HTTP/SOCKS5 connect strings |
+| `pool_get_my_stats` | Get your own pool usage (traffic, active connections) + aggregated pool health |
+| `pool_set_proxy_password` | Set or update your proxy authentication password (separate from your account login password, min 6 chars) |
 | `pool_mint_key` | Mint a new Pool Access Key (`pak_`) for a customer. `trafficCapGB` null = unlimited within your pool; `qualityTier: "safe"` routes only premium (mbl) stock |
 | `pool_list_keys` | List your Pool Access Keys (masked) |
+| `pool_update_key` | Update a key's label/enabled/trafficCapGB/expiresAt/qualityTier (pass `null` to clear cap/expiry) |
 | `pool_topup_key` | Top up a `pak_` key: add traffic cap and/or extend expiry (atomic) |
+| `pool_regenerate_key` | Rotate a key's secret `pak_` value - the old value stops working immediately |
+| `pool_reveal_key` | Reveal the full `pak_` secret for a key (audit-logged as a "reveal" event) |
+| `pool_delete_key` | Delete a Pool Access Key |
+| `pool_key_usage` | Daily in/out MB bandwidth time-series for one key (default 30 days, max 365) |
+| `pool_key_audit` | Forensic audit log for one key: create/update/topup/regenerate/reveal/delete/gateway auth events |
 
 ### Ops Tools (Admin)
 
@@ -469,8 +479,8 @@ Your account balance is $45.00. You have 5/10 shared slots used and 2.5/10 GB tr
 ### Create a Proxy Port
 
 ```
-User: Create a new shared proxy in Germany
-Claude: [Uses list_available_countries to find Germany ID]
+User: Create a new shared proxy in Poland
+Claude: [Uses list_available_countries to find Poland's ID]
 Claude: [Uses create_port with countryId and type=shared]
 Port created! Here are your connection details:
   HTTP: http://user123:pass456@proxy.example.com:8080
@@ -694,7 +704,7 @@ npm list @proxies-sx/mcp-server
 # Verify package loads correctly
 node -e "require('@proxies-sx/mcp-server/dist/tools')" && echo "OK"
 
-# Check tool count (should be 61 - the API-key set; x402 wallet tools add 18 more for 79 total)
+# Check tool count (should be 70 - the API-key set; x402 wallet tools add 19 more for 89 total)
 node -e "console.log(require('@proxies-sx/mcp-server/dist/tools').allToolDefinitions.length)"
 ```
 

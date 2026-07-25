@@ -35,7 +35,7 @@ export const x402ToolDefinitions = [
           type: 'string',
           enum: ['shared', 'private'],
           description:
-            'Proxy tier. shared=$4.00/GB, private=$8.00/GB (exclusive device). Duration is FREE. Default: shared',
+            'Proxy tier. $4.00/GB. Duration is FREE. Default: shared',
         },
         city: {
           type: 'string',
@@ -199,7 +199,7 @@ export const x402ToolDefinitions = [
     description:
       'Buy Pool Gateway access with USDC on Base or Solana - no API key, payment is authentication. ' +
       'Unlike x402_get_proxy (one dedicated modem), this returns ONE credential that reaches EVERY country in your tier ' +
-      'via the username DSL (e.g. psx_xxx-mbl-us, -mbl-de, ...). v1 tier is "mbl" ($4/GB, metered, production ProxySmart modems). ' +
+      'via the username DSL (e.g. psx_xxx-mbl-us, -mbl-pl, ...). v1 tier is "mbl" ($4/GB, metered, production ProxySmart modems). ' +
       'HTTP proxy on port 7000 only. Pays on-chain then caches the returned session token. ' +
       'Note: sticky pins the MODEM, not the IP - carrier NAT may still re-issue the egress IP.',
     inputSchema: {
@@ -304,6 +304,26 @@ export const x402ToolDefinitions = [
     },
   },
   {
+    name: 'x402_pool_usage',
+    description:
+      'Get per-day bandwidth usage (MB) for a pool session over the last N days (default 30, max 365), gap-filled with zeroes. ' +
+      'Uses the cached session token if session_token is omitted.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        session_token: {
+          type: 'string',
+          description: 'Pool session token (x402s_...). Optional - uses the cached pool session if omitted.',
+        },
+        days: {
+          type: 'number',
+          description: 'Number of days of history to return (default 30, max 365).',
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'x402_pool_pricing',
     description:
       'Get the Pool Gateway tier catalog (no auth, no wallet needed): tiers, $/GB, min purchase, supported networks, and the username DSL. ' +
@@ -384,6 +404,10 @@ export const x402Schemas = {
   }),
   x402_pool_connection: z.object({
     session_token: z.string().optional(),
+  }),
+  x402_pool_usage: z.object({
+    session_token: z.string().optional(),
+    days: z.number().min(1).max(365).optional(),
   }),
   x402_pool_pricing: z.object({}),
   get_pool_stock: z.object({}),
