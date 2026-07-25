@@ -26,7 +26,7 @@ function toolError(tool: string, message: string, retryable: boolean, suggestion
  */
 const PRICING_RATES: Record<X402Tier, { perGB: number }> = {
   shared: { perGB: 4.0 },
-  private: { perGB: 8.0 },
+  private: { perGB: 4.0 },
 };
 
 /**
@@ -182,11 +182,10 @@ export function createX402ToolHandlers(
         `Total: $${total.toFixed(2)} USDC`,
         balanceInfo,
         ``,
-        `Tier Rates (duration is always FREE):`,
-        `  shared:  $4.00/GB (shared device, best value)`,
-        `  private: $8.00/GB (exclusive device, guaranteed speed)`,
+        `Rate (duration is always FREE):`,
+        `  $4.00/GB (single price, volume-discounted to $2.40/GB at 250GB+)`,
         ``,
-        `Min purchase: 0.1 GB ($0.40 shared, $0.80 private)`,
+        `Min purchase: 0.1 GB ($0.40)`,
       ].join('\n');
     },
 
@@ -617,7 +616,7 @@ export function createX402ToolHandlers(
           `Pool Gateway access purchased!`,
           ``,
           `ONE credential reaches every country in your tier via the username DSL`,
-          `(e.g. ${proxy.username}-mbl-us, -mbl-de, ...). HTTP proxy on port ${proxy.httpPort} only.`,
+          `(e.g. ${proxy.username}-mbl-us, -mbl-pl, ...). HTTP proxy on port ${proxy.httpPort} only.`,
           ``,
           `--- Connection ---`,
           `HTTP: ${httpUrl}`,
@@ -808,6 +807,40 @@ export function createX402ToolHandlers(
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         return toolError('x402_pool_connection', message, true);
+      }
+    },
+
+    /**
+     * Get per-day bandwidth usage (MB) for a pool session
+     */
+    async x402_pool_usage(args: { session_token?: string; days?: number }): Promise<string> {
+      const token = args.session_token || cache.getPoolToken();
+      if (!token) {
+        return `No pool session token provided or cached. Buy pool access first with x402_get_pool_access.`;
+      }
+      try {
+        const result = await client.getPoolUsage(token, args.days);
+        const lines = [
+          `Pool Gateway Usage`,
+          ``,
+          result.tier ? `Tier: ${result.tier}` : '',
+          `Days: ${result.days ?? args.days ?? 30}`,
+          ``,
+          `--- Daily Usage (MB) ---`,
+        ].filter(Boolean);
+
+        if (!result.usage || result.usage.length === 0) {
+          lines.push(`No usage recorded yet.`);
+        } else {
+          for (const day of result.usage) {
+            lines.push(`  ${day.date}: ${day.mb} MB`);
+          }
+        }
+
+        return lines.join('\n');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return toolError('x402_pool_usage', message, true);
       }
     },
 

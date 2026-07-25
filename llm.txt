@@ -37,7 +37,7 @@ npx @proxies-sx/mcp-server
 - Agents pay directly with crypto - no signup required
 - Uses HTTP 402 Payment Required protocol
 
-## Available Tools (79 Total)
+## Available Tools (89 Total: 70 API-key + 19 x402)
 
 ### Account Management
 - `get_account_summary` - Balance, slots, traffic usage
@@ -93,14 +93,23 @@ npx @proxies-sx/mcp-server
 - `reply_to_ticket` - Reply to an existing ticket
 - `close_ticket` - Close a resolved ticket
 
-### Pool Gateway (reseller / gateway access)
+### Pool Gateway (16 tools: self-service + reseller / gateway access)
 - `pool_get_stock` - Live Pool Gateway availability: online endpoint counts per country (no auth)
-- `pool_build_proxy_url` - Build a gateway proxy URL from a proxyUsername + pak_ key via the username token DSL (pure local, no network)
+- `pool_build_proxy_url` - Build a gateway proxy URL from a proxyUsername + pak_ key via the username token DSL (pool/country/carrier/city/iptype/sid/rot; pure local, no network). `ipType` (mobile/residential/datacenter) hard-filters the `peer` pool to one exit class
 - `pool_list_sessions` - List live Pool Gateway sessions (traffic, exit IP, country); pakId scopes to one customer
 - `pool_close_session` - Close one live gateway session by sessionKey
+- `pool_get_my_credentials` - Get your own pool proxyUsername + ready-to-use HTTP/SOCKS5 connect strings
+- `pool_get_my_stats` - Get your own pool usage (traffic, active connections) + aggregated pool health
+- `pool_set_proxy_password` - Set or update your proxy auth password (separate from account login, min 6 chars)
 - `pool_mint_key` - Mint a new Pool Access Key (pak_) for a customer (reseller role required)
 - `pool_list_keys` - List your Pool Access Keys (masked)
+- `pool_update_key` - Update a key's label/enabled/trafficCapGB/expiresAt/qualityTier (reseller)
 - `pool_topup_key` - Add traffic cap and/or extend expiry on a pak_ key (atomic)
+- `pool_regenerate_key` - Rotate a key's secret pak_ value (reseller)
+- `pool_reveal_key` - Reveal the full pak_ secret, audit-logged as a "reveal" event (reseller)
+- `pool_delete_key` - Delete a Pool Access Key (reseller)
+- `pool_key_usage` - Daily in/out MB bandwidth time-series for one key (default 30 days, max 365) (reseller)
+- `pool_key_audit` - Forensic audit log for one key: create/update/topup/regenerate/reveal/delete/gateway-auth events (reseller)
 
 ### Ops (admin/ops agents - requires admin API key with ops:* scopes; capped + audited)
 - `ops_get_user` - Customer 360 view: balance, gateway usage, ports, farmer note
@@ -129,11 +138,12 @@ npx @proxies-sx/mcp-server
 - `x402_service_status` - Health check
 
 ### x402 Pool Gateway (wallet-only, one credential for every country in your tier)
-- `x402_get_pool_access` - Buy Pool Gateway access with USDC (one credential, username DSL, HTTP :7000, mbl tier $4/GB)
+- `x402_get_pool_access` - Buy Pool Gateway access with USDC (one credential, username DSL, HTTP :7000, mbl tier $4/GB, 6 countries: US/GB/FR/NL/PL/GE)
 - `x402_pool_credit` - Check remaining pool credit (GB) for a pool session
 - `x402_pool_topup` - Add GB (paid, $4/GB) and/or duration (free) to a pool session
 - `x402_pool_regenerate` - Rotate the pool credential secret (same username, new password)
 - `x402_pool_connection` - Re-emit pool proxy credentials (recovery)
+- `x402_pool_usage` - Per-day bandwidth usage (MB) for a pool session (default 30 days, max 365)
 - `x402_pool_pricing` - Pool Gateway tier catalog (no auth, no wallet)
 - `get_pool_stock` - Public pool stock: online endpoint counts per country, no IPs (no auth)
 
@@ -191,10 +201,10 @@ SOCKS5: socks5://x402_abc:xyz@tmcal1.ddns.net:5500
 
 ### Create Port (API Key Mode)
 ```
-User: Create a shared proxy in Germany
+User: Create a shared proxy in Poland
 Agent: [Uses list_available_countries, create_port]
 
-Port created in Germany:
+Port created in Poland:
 HTTP: http://user:pass@proxy.example.com:8080
 ```
 
@@ -231,5 +241,5 @@ IP rotated successfully! New IP: 185.123.xxx.xxx
 - MCP Integration: https://proxies.sx/mcp
 - x402 Protocol: https://proxies.sx/x402
 - npm Package: https://www.npmjs.com/package/@proxies-sx/mcp-server
-- GitHub: https://github.com/proxies-sx/mcp-server
+- GitHub: https://github.com/bolivian-peru/proxies-sx-mcp-server
 - Support: maya@proxies.sx

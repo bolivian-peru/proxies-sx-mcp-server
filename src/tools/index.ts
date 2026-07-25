@@ -181,6 +181,15 @@ export function createAllToolHandlers(api: ProxiesApi, baseUrl: string): ToolHan
     pool_mint_key: (args) => poolHandlers.pool_mint_key(args as Parameters<typeof poolHandlers.pool_mint_key>[0]),
     pool_list_keys: () => poolHandlers.pool_list_keys(),
     pool_topup_key: (args) => poolHandlers.pool_topup_key(args as Parameters<typeof poolHandlers.pool_topup_key>[0]),
+    pool_get_my_credentials: () => poolHandlers.pool_get_my_credentials(),
+    pool_get_my_stats: () => poolHandlers.pool_get_my_stats(),
+    pool_set_proxy_password: (args) => poolHandlers.pool_set_proxy_password(args as Parameters<typeof poolHandlers.pool_set_proxy_password>[0]),
+    pool_update_key: (args) => poolHandlers.pool_update_key(args as Parameters<typeof poolHandlers.pool_update_key>[0]),
+    pool_regenerate_key: (args) => poolHandlers.pool_regenerate_key(args as Parameters<typeof poolHandlers.pool_regenerate_key>[0]),
+    pool_reveal_key: (args) => poolHandlers.pool_reveal_key(args as Parameters<typeof poolHandlers.pool_reveal_key>[0]),
+    pool_delete_key: (args) => poolHandlers.pool_delete_key(args as Parameters<typeof poolHandlers.pool_delete_key>[0]),
+    pool_key_usage: (args) => poolHandlers.pool_key_usage(args as Parameters<typeof poolHandlers.pool_key_usage>[0]),
+    pool_key_audit: (args) => poolHandlers.pool_key_audit(args as Parameters<typeof poolHandlers.pool_key_audit>[0]),
   };
 }
 

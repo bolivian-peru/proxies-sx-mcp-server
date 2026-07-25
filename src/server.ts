@@ -148,6 +148,7 @@ export async function createMcpServer(config: McpServerConfig) {
       x402_pool_topup: (args) => x402Handlers.x402_pool_topup(args as Parameters<typeof x402Handlers.x402_pool_topup>[0]),
       x402_pool_regenerate: (args) => x402Handlers.x402_pool_regenerate(args as Parameters<typeof x402Handlers.x402_pool_regenerate>[0]),
       x402_pool_connection: (args) => x402Handlers.x402_pool_connection(args as Parameters<typeof x402Handlers.x402_pool_connection>[0]),
+      x402_pool_usage: (args) => x402Handlers.x402_pool_usage(args as Parameters<typeof x402Handlers.x402_pool_usage>[0]),
       x402_pool_pricing: () => x402Handlers.x402_pool_pricing(),
       get_pool_stock: () => x402Handlers.get_pool_stock(),
     };
@@ -164,7 +165,7 @@ export async function createMcpServer(config: McpServerConfig) {
   const server = new Server(
     {
       name: 'proxies-sx-mcp',
-      version: '2.2.0',
+      version: '2.4.1',
     },
     {
       capabilities: {

@@ -1,6 +1,6 @@
 {
   "name": "@proxies-sx/mcp-server",
-  "version": "2.2.0",
+  "version": "2.4.1",
   "description": "MCP (Model Context Protocol) server for Proxies.sx mobile proxy API - enables AI agents to manage proxy infrastructure",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -60,6 +60,7 @@
     "dist",
     "README.md",
     "LICENSE",
-    "llm.txt"
+    "llm.txt",
+    "SKILL.md"
   ]
 }

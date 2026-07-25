@@ -5,10 +5,12 @@ description: Manage Proxies.sx mobile/residential proxies, mint x402 USDC sessio
 
 # Proxies.sx MCP Server
 
-Open-source [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 61 typed tools to any MCP-compatible AI agent. Two operating modes:
+Open-source [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 89 typed tools to any MCP-compatible AI agent. Two operating modes:
 
-- **API Key mode** — agent acts on behalf of a logged-in Proxies.sx user (44 tools: ports, rotation, billing, payments, support, etc.)
-- **x402 Autonomous mode** — agent pays for its own proxies with USDC on Base or Solana, no human account needed (17 tools: `x402_get_proxy`, `x402_rotate_ip`, `x402_get_pool_access`, …)
+- **API Key mode (MAIN path)** — agent acts on behalf of a logged-in Proxies.sx user with deposited GB balance (70 tools: ports, rotation, billing, pool gateway, payments, support, ops, etc.)
+- **x402 Autonomous mode (optional)** — agent pays for its own proxies with USDC on Base or Solana, no human account needed (19 tools: `x402_get_proxy`, `x402_rotate_ip`, `x402_get_pool_access`, …)
+
+API Key mode is the primary, recommended path for most integrations — it's simpler (no wallet/gas handling) and works for anyone with a Proxies.sx account. x402 exists specifically for **account-less agents** that need to pay per-request with crypto.
 
 Source: <https://github.com/bolivian-peru/proxies-sx-mcp-server> · npm: [`@proxies-sx/mcp-server`](https://www.npmjs.com/package/@proxies-sx/mcp-server) · License: MIT.
 
@@ -27,6 +29,7 @@ Use it for any of these intents:
 - "How do I scrape with mobile IPs from Claude / Cursor?"
 - "Use x402 to mint a proxy from my agent"
 - "My agent wallet balance is low — top up the session"
+- "I need mobile vs residential exit IPs, not just any peer"
 
 If the user mentions any of: `@proxies-sx/mcp-server`, MCP proxy, x402 MCP, agent-driven proxy buying, AGENT_WALLET_KEY, PROXIES_API_KEY env var, `psx_` keys, `pak_` keys (in MCP context), or `mcp.json` configuration — this skill applies.
 
@@ -36,22 +39,22 @@ If the user mentions any of: `@proxies-sx/mcp-server`, MCP proxy, x402 MCP, agen
 
 Before installing or generating code, ask which mode the user wants. They behave very differently.
 
-### Mode A — API Key (44 tools, requires Proxies.sx account)
+### Mode A — API Key (70 tools, requires a Proxies.sx account) — MAIN path
 
-Use when the user already has a Proxies.sx account and wants their agent to manage **their** proxy fleet.
+Use when the user already has a Proxies.sx account (or is willing to create one and deposit GB) and wants their agent to manage **their** proxy fleet. This is the default recommendation unless the user specifically needs an account-less, wallet-only agent.
 
-- Tools: account, ports, rotation, billing, crypto payments, support tickets, x402 session management
+- Tools: account, ports, rotation, billing, pool gateway (16), crypto payments, support tickets, x402 session management, ops (11, admin-only)
 - Auth: `PROXIES_API_KEY=psx_...` env var (mint at [client.proxies.sx/account](https://client.proxies.sx/account))
-- Cost: pays from the user's existing account balance
+- Cost: pays from the user's existing account balance (deposited GB, $4/GB, volume-discounted to $2.40/GB at 250 GB+)
 
-### Mode B — x402 Autonomous (17 tools, no account needed)
+### Mode B — x402 Autonomous (19 tools, no account needed) — optional, for account-less agents
 
-Use when the user is building an **autonomous agent** that should pay for its own bandwidth without human intervention.
+Use when the user is building a fully autonomous agent that must pay for its own bandwidth with crypto, with zero human account setup.
 
-- Dedicated-proxy tools: `x402_get_proxy`, `x402_get_pricing`, `x402_wallet_balance`, `x402_rotate_ip`, `x402_list_sessions`, `x402_check_session`, `x402_list_countries`, `x402_list_cities`, `x402_list_carriers`, `x402_service_status`
-- Pool Gateway tools: `x402_get_pool_access`, `x402_pool_credit`, `x402_pool_topup`, `x402_pool_regenerate`, `x402_pool_connection`, `x402_pool_pricing`, `get_pool_stock`
+- Dedicated-proxy tools: `x402_get_proxy`, `x402_get_pricing`, `x402_wallet_balance`, `x402_rotate_ip`, `x402_list_sessions`, `x402_check_session`, `x402_list_countries`, `x402_list_cities`, `x402_list_carriers`, `x402_extend_session`, `x402_service_status`
+- Pool Gateway tools: `x402_get_pool_access`, `x402_pool_credit`, `x402_pool_topup`, `x402_pool_regenerate`, `x402_pool_connection`, `x402_pool_usage`, `x402_pool_pricing`, `get_pool_stock`
 - Auth: `AGENT_WALLET_KEY=<base58 Solana key | hex EVM key>` env var
-- Cost: USDC paid per request from the agent's own wallet (Solana ~$0.0001 gas, Base ~$0.01 gas). $4/GB, metered.
+- Cost: USDC paid per request from the agent's own wallet (Solana ~$0.0001 gas, Base ~$0.01 gas). $4/GB, metered, volume-discounted to $2.40/GB at 250 GB+.
 
 ### Mode C — Both at once
 
@@ -133,15 +136,15 @@ npx -y @proxies-sx/mcp-server --help
 # Should print version + usage.
 ```
 
-If your MCP client has a "Tools" panel, you should see ~61 tools prefixed `proxies-sx`. If you see 0, the env vars are missing or the binary failed to download — check the client's MCP error log.
+If your MCP client has a "Tools" panel, you should see 89 tools prefixed `proxies-sx` (70 if only `PROXIES_API_KEY` is set, 19 if only `AGENT_WALLET_KEY` is set). If you see 0, the env vars are missing or the binary failed to download — check the client's MCP error log.
 
 ---
 
 ## Tool catalog
 
-61 tools organized by category. Use the table to pick the right tool for the user's intent.
+89 tools organized by category. Use the table to pick the right tool for the user's intent.
 
-### API Key mode (44 tools)
+### API Key mode (70 tools)
 
 | Category | Count | Representative tools |
 |---|---|---|
@@ -149,33 +152,57 @@ If your MCP client has a "Tools" panel, you should see ~61 tools prefixed `proxi
 | Port management | 7 | `list_ports`, `create_port`, `delete_port`, `update_port_credentials`, `update_os_fingerprint`, `reconfigure_port`, `get_port` |
 | Port status | 4 | `get_port_status`, `get_port_ip`, `ping_port`, `speed_test_port` |
 | Rotation | 5 | `rotate_port`, `check_rotation_availability`, `configure_auto_rotation`, `get_rotation_history`, `get_rotation_token_url` |
-| Billing | 4 | `get_pricing` ($4/GB metered), `calculate_price`, `purchase_shared_traffic`, `purchase_private_traffic` (legacy; metered $4/GB) |
+| Billing | 3 | `get_pricing` ($4/GB, volume-discounted to $2.40/GB at 250GB+), `calculate_price`, `purchase_shared_traffic` |
 | Crypto payments | 5 | `create_crypto_payment`, `check_crypto_payment_status`, `get_pending_crypto_payments`, `cancel_crypto_payment`, `get_crypto_payment_info` |
 | Reference | 1 | `list_available_countries` |
 | Utilities | 3 | `get_proxy_connection_string`, `get_all_proxy_formats`, `get_os_fingerprint_options` |
 | Support | 5 | `create_support_ticket`, `list_my_tickets`, `get_ticket`, `reply_to_ticket`, `close_ticket` |
 | x402 session mgmt | 8 | `get_x402_session`, `list_x402_ports`, `get_x402_port_status`, `get_sessions_by_wallet`, `get_session_status`, `replace_x402_port`, `calculate_x402_topup`, `topup_x402_session` |
+| Ops (admin only, `ops:*` scopes) | 11 | `ops_get_user`, `ops_get_user_audit`, `ops_reconcile_payments`, `ops_list_tickets`, `ops_reply_ticket`, `ops_set_slots`, `ops_credit_balance`, `ops_email_user`, `ops_list_farmers`, `ops_get_farmer`, `ops_write_farmer_note` |
+| **Pool Gateway** | **16** | see below |
 
-### x402 Autonomous mode (17 tools)
+**Pool Gateway (16 tools)** — the flagship one-port product, self-service + reseller management:
 
-**Dedicated proxy (10 tools)**
+| Tool | What it does |
+|---|---|
+| `pool_get_stock` | Online endpoint counts per country (no auth needed) |
+| `pool_build_proxy_url` | In-tool DSL builder: pool/country/carrier/city/**iptype**/sid/rot — no network call |
+| `pool_list_sessions` | List live gateway sessions (traffic, exit IP, country) |
+| `pool_close_session` | Close one live session |
+| `pool_get_my_credentials` | Your own proxyUsername + ready-to-use HTTP/SOCKS5 connect strings |
+| `pool_get_my_stats` | Your own usage + aggregated pool health |
+| `pool_set_proxy_password` | Set/update your proxy auth password (separate from account login) |
+| `pool_mint_key` | Mint a Pool Access Key (`pak_`) for a customer (reseller role) |
+| `pool_list_keys` | List your Pool Access Keys (masked) |
+| `pool_update_key` | Update label/enabled/trafficCapGB/expiresAt/qualityTier |
+| `pool_topup_key` | Atomically add cap/extend expiry |
+| `pool_regenerate_key` | Rotate a key's secret |
+| `pool_reveal_key` | Reveal the full `pak_` secret (audit-logged) |
+| `pool_delete_key` | Delete a key |
+| `pool_key_usage` | Daily in/out MB time-series for one key |
+| `pool_key_audit` | Forensic audit log for one key |
+
+### x402 Autonomous mode (19 tools)
+
+**Dedicated proxy + session management (11 tools)**
 
 | Tool | What it does |
 |---|---|
 | `x402_get_proxy` | Buy a dedicated proxy with USDC ($4/GB, metered). Pays on-chain, returns credentials. |
-| `x402_get_pricing` | Get current pricing ($4/GB, metered). |
+| `x402_get_pricing` | Get current pricing ($4/GB, metered, volume-discounted). |
 | `x402_wallet_balance` | Check the agent's USDC balance on Base + Solana. |
 | `x402_list_sessions` | List the agent's active sessions. |
 | `x402_check_session` | Status of a specific session by token. |
 | `x402_rotate_ip` | Rotate the IP for a session (free). |
-| `x402_list_countries` | Available countries with live device counts. |
+| `x402_list_countries` | Available countries with live device counts. Currently: US, GB, FR, NL, PL, GE (Georgia). |
 | `x402_list_cities` | Cities in a country. |
 | `x402_list_carriers` | Mobile carriers in a country. |
+| `x402_extend_session` | Extend session duration for FREE (duration-only top-up). |
 | `x402_service_status` | Health check for the x402 service. |
 
-(To extend a dedicated-port session, use `calculate_x402_topup` / `topup_x402_session` from the session-management group.)
+(To add traffic to a dedicated-port session, use `calculate_x402_topup` / `topup_x402_session` from the session-management group.)
 
-**Pool Gateway access (7 tools)** — one credential reaches every country in your tier via the username DSL. v1 tier = `mbl` ($4/GB, production modems, HTTP :7000).
+**Pool Gateway access (8 tools)** — one credential reaches every country in your tier via the username DSL. v1 tier = `mbl` ($4/GB, production ProxySmart modems, 6 countries: US/GB/FR/NL/PL/GE, HTTP :7000).
 
 | Tool | What it does |
 |---|---|
@@ -184,10 +211,11 @@ If your MCP client has a "Tools" panel, you should see ~61 tools prefixed `proxi
 | `x402_pool_topup` | Pay USDC for more GB (duration-only is free). |
 | `x402_pool_regenerate` | Rotate the credential secret (same username, new password). |
 | `x402_pool_connection` | Re-emit credentials (recovery). |
+| `x402_pool_usage` | Per-day MB usage series (default 30 days, max 365). |
 | `x402_pool_pricing` | Tier catalog + username DSL (no auth needed). |
 | `get_pool_stock` | Public online endpoint counts per country (no IPs). |
 
-> Pool quality copy: `mbl` is the production tier. **Sticky pins the modem, not the IP** — carrier NAT may still re-issue the egress IP. Never claim peer reliability.
+> Pool quality copy: `mbl` is the production tier (6 countries: US/GB/FR/NL/PL/GE). **Sticky pins the modem, not the IP** — carrier NAT may still re-issue the egress IP. On the API-key side, `pool_build_proxy_url` also supports `ipType` (`mobile`/`residential`/`datacenter`) to hard-filter the `peer` pool to one exit class.
 
 ---
 
@@ -195,10 +223,29 @@ If your MCP client has a "Tools" panel, you should see ~61 tools prefixed `proxi
 
 Generate code that matches the user's intent. Here are the recipes most users want:
 
+### "Manage my account's proxies" (API key mode — MAIN path, start here)
+
+```
+1. Tool: list_ports — see what you have
+2. Tool: create_port with country="us" — add a new one
+3. Tool: get_proxy_connection_string with portId — get formatted URLs
+4. Tool: rotate_port — get a new IP on demand
+5. Tool: configure_auto_rotation with interval=30 — set up auto IP rotation every 30 minutes
+```
+
+### "Get one credential that works for every country in my tier" (API key mode, Pool Gateway)
+
+```
+1. Tool: pool_get_my_credentials — get your proxyUsername + connect strings
+2. Tool: pool_build_proxy_url with pool="peer", country="us", ipType="residential", rotation="sticky", sid="job1"
+   — builds a URL that hard-filters to residential peer exit IPs in the US, pinned for the session
+3. Tool: pool_get_my_stats — check usage
+```
+
 ### "Buy a proxy and use it" (x402 mode)
 
 ```
-1. Tool: x402_get_proxy with country="us", traffic=1, tier="shared"
+1. Tool: x402_get_proxy with country="us", traffic=1
 2. Save the returned sessionToken (x402s_...) and proxy credentials
 3. Use the proxy in any HTTP client
 4. When done, optional: calculate_x402_topup + topup_x402_session to add traffic
@@ -211,18 +258,8 @@ Generate code that matches the user's intent. Here are the recipes most users wa
 2. Tool: get_pool_stock — check which countries currently have capacity
 3. Tool: x402_get_pool_access with traffic_gb=5 (tier defaults to mbl)
 4. Use the returned credential, switching country via the username DSL:
-   psx_xxx-mbl-us, psx_xxx-mbl-de, ... (HTTP proxy on port 7000)
+   psx_xxx-mbl-us, psx_xxx-mbl-pl, ... (HTTP proxy on port 7000)
 5. Tool: x402_pool_credit — check remaining GB; x402_pool_topup to add more
-```
-
-### "Manage my account's proxies" (API key mode)
-
-```
-1. Tool: list_ports — see what you have
-2. Tool: create_port with country="us" — add a new one
-3. Tool: get_proxy_connection_string with portId — get formatted URLs
-4. Tool: rotate_port — get a new IP on demand
-5. Tool: configure_auto_rotation with interval=30 — set up auto IP rotation every 30 minutes
 ```
 
 ### "Refill my proxy session before it expires"
@@ -295,8 +332,8 @@ DO NOT skip these. Burn them into any setup the user follows:
 
 Wholesale rates are platform-configurable and change. Don't hardcode dollar amounts when the user asks "how much does X cost". Instead:
 
-- For a precise live answer: `Tool: get_pricing` (API key mode) or `x402_get_pricing` (x402 mode).
-- For ballpark guidance: tell the user "the live rate is in your `client.proxies.sx` dashboard or the `/v1/x402/pricing` endpoint — pin nothing in code".
+- For a precise live answer: `Tool: get_pricing` (API key mode) or `x402_get_pricing` / `x402_pool_pricing` (x402 mode).
+- For ballpark guidance: tell the user "$4/GB, volume-discounted to $2.40/GB at 250 GB+ — the live rate is confirmed via the pricing tool, pin nothing in code".
 
 ---
 

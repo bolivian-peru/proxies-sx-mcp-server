@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.4.1 (2026-07-25)
+
+Doc/example correctness pass on top of 2.4.0 — no tool surface changes, no version-number-worthy behavior changes to already-shipped code. Tool count unchanged at 89 (70 api-key + 19 x402).
+
+### Fixed
+- Corrected stale dedicated-port country claims (README, llm.txt) from `DE, PL, US, FR, ES, GB` to the real, live set: `US, GB, FR, NL, PL, GE` (Georgia — not Germany, not Spain). Verified against `GET /v1/x402/countries` on the production backend; this is also the exact 6-country set behind the Pool Gateway `mbl` tier.
+- Replaced "Create a shared proxy in Germany" examples (README, llm.txt) and the `-mbl-de` DSL example (README, and the `x402_get_pool_access` tool description + purchase-confirmation message in source) — Germany has zero device stock on this backend. Examples now use Poland/`-mbl-pl`, which is real, live stock.
+- Fixed a wrong GitHub URL in `llm.txt` (`github.com/proxies-sx/mcp-server` → `github.com/bolivian-peru/proxies-sx-mcp-server`).
+- `llm.txt` tool catalog was still showing the pre-2.3.0 count (79 tools, 7-tool Pool Gateway section) and was missing `x402_pool_usage`. Brought back in sync with README/CLAUDE.md: 89 tools total, 16-tool Pool Gateway section, 8-tool wallet-side x402 pool section.
+- Restored `SKILL.md` (present on npm/GitHub history but missing from the monorepo source since before 2.0.0) and brought its tool counts/examples/countries up to date — it was still describing the 61-tool/44/17 era.
+
+## 2.4.0 (2026-07-24)
+
+_Published to npm 2026-07-24T19:59:49Z. This entry documents what actually shipped in that release; the GitHub source repo had not been synced past 2.2.0 until the 2.4.1 pass above caught it up._
+
+### Added
+- **`ipType` hard-filter on `pool_build_proxy_url`.** New optional `ipType` param (`mobile`/`residential`/`datacenter`) emits the gateway's existing `-iptype-<value>` DSL token, hard-filtering the `peer` pool to a single exit class. `mbl` is mobile-only by construction, so this only matters for `peer`/`any`/`best`. This is a client-side DSL-builder update — the gateway already enforced `-iptype-` server-side, no new backend surface was added.
+- `pool_build_proxy_url` `rotation` enum expanded to the gateway's real rotation modes: `sticky`, `hard`, `auto5`, `auto10`, `auto20`, `auto60`, `ondemand` (was `sticky`/`rotate` — `rotate` was never a real gateway value).
+- `pool_build_proxy_url` `pool` enum expanded to `mbl`/`peer`/`any`/`best` (was `mbl`/`peer` only).
+- `pool_build_proxy_url` `sid` description now reflects the self-healing gateway parser: 1–64 chars (no more artificial 8-char minimum), and calls out that a `sid` is required for sticky/auto rotation to persist across connections.
+
+## 2.3.0 (2026-07-24)
+
+### Added
+- **Coverage-gap fill: 9 API-key pool tools.** Self-service: `pool_get_my_credentials` (`GET /v1/gateway/credentials`), `pool_get_my_stats` (`GET /v1/gateway/pool/my-stats`), `pool_set_proxy_password` (`PATCH /v1/account/proxy-password`). Reseller pool-access-key management: `pool_update_key` (`PATCH /v1/reseller/pool-keys/:id`), `pool_regenerate_key` (`POST .../regenerate`), `pool_reveal_key` (`POST .../reveal`, audit-logged), `pool_delete_key` (`DELETE`), `pool_key_usage` (`GET .../usage`), `pool_key_audit` (`GET .../audit`).
+- **`x402_pool_usage` (wallet-side x402 pool group):** `GET /v1/x402/manage/pool/usage` — per-day MB series for a pool session (default 30d, max 365d). The API client method (`X402Client.getPoolUsage`) already existed; this wires it to a tool.
+
+### Notes
+- Total tools: 79 -> **89** (70 api-key + 19 x402).
+
 ## 2.2.0 (2026-07-02)
 
 ### Fixed
