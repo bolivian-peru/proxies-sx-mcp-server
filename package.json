@@ -1,21 +1,22 @@
 {
   "name": "@proxies-sx/mcp-server",
-  "version": "2.4.1",
-  "description": "MCP (Model Context Protocol) server for Proxies.sx mobile proxy API - enables AI agents to manage proxy infrastructure",
+  "version": "3.0.0",
+  "description": "MCP (Model Context Protocol) server for Proxies.sx: residential and mobile proxies for AI agents (Pool Gateway URLs, live stock, dedicated ports, Private Pools, billing, support)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "proxies-sx-mcp": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc && chmod +x dist/index.js",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc && chmod +x dist/index.js",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src",
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts",
     "check:sync": "node scripts/check-sync.cjs",
-    "prepublishOnly": "npm run build && npm run check:sync"
+    "build:manifest": "node scripts/build-manifest.cjs",
+    "prepublishOnly": "npm run build && npm run build:manifest && npm run check:sync"
   },
   "keywords": [
     "mcp",
@@ -27,7 +28,9 @@
     "ai-agent",
     "anthropic",
     "proxy-management",
-    "ip-rotation"
+    "ip-rotation",
+    "residential-proxy",
+    "pool-gateway"
   ],
   "author": "Proxies.sx",
   "license": "MIT",
@@ -61,6 +64,9 @@
     "README.md",
     "LICENSE",
     "llm.txt",
-    "SKILL.md"
-  ]
+    "SKILL.md",
+    "server.json",
+    "tools.json"
+  ],
+  "mcpName": "io.github.bolivian-peru/proxies-sx-mcp-server"
 }

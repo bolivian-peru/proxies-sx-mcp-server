@@ -1,6 +1,6 @@
-# Raw MCP Protocol + Proxies.sx
+# Raw MCP client + Proxies.sx
 
-Direct MCP protocol usage without framework wrappers. Best for custom integrations.
+Direct MCP protocol usage without a framework. The same calls work from any MCP client library.
 
 ## Setup
 
@@ -8,160 +8,105 @@ Direct MCP protocol usage without framework wrappers. Best for custom integratio
 npm install @modelcontextprotocol/sdk @proxies-sx/mcp-server
 ```
 
-## Full Example: Purchase, Use, Rotate, Clean Up
+## Get a Pool Gateway proxy URL and use it
 
 ```typescript
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
+async function callTool(client: Client, name: string, args: Record<string, unknown> = {}): Promise<string> {
+  const result = await client.callTool({ name, arguments: args });
+  const text = (result.content as Array<{ text: string }>)[0].text;
+  // A failed tool answers isError: true with a text that says what to do
+  if (result.isError) throw new Error(text);
+  return text;
+}
+
 async function main() {
-  // 1. Connect to MCP server
+  // 1. Start the server. PROXIES_API_URL is not needed.
   const transport = new StdioClientTransport({
     command: "npx",
     args: ["-y", "@proxies-sx/mcp-server"],
-    env: {
-      PROXIES_API_KEY: process.env.PROXIES_API_KEY!,
-      PROXIES_API_URL: "https://api.proxies.sx/v1",
-    },
+    env: { PATH: process.env.PATH!, PROXIES_API_KEY: process.env.PROXIES_API_KEY! },
   });
-
   const client = new Client({ name: "my-agent", version: "1.0.0" });
   await client.connect(transport);
 
-  // 2. Check account balance
-  const account = await callTool(client, "get_account_summary");
-  console.log("Account:", account);
+  // 2. Is there traffic left, and stock where we want it?
+  console.log(await callTool(client, "get_account_usage"));
+  const stock = JSON.parse(await callTool(client, "pool_get_stock", { country: "de" }));
+  console.log(`DE: ${stock.peer} peer endpoints, ${stock.mbl} carrier modems`);
 
-  // 3. Check available countries
-  const countries = await callTool(client, "list_available_countries", {});
-  console.log("Countries:", countries);
+  // 3. Credentials (contains a secret: do not log it)
+  const credentials = JSON.parse(await callTool(client, "pool_get_my_credentials"));
 
-  // 4. Create a proxy port
-  const port = await callTool(client, "create_port", {
-    country: "US",
-    trafficGB: 1,
-    tier: "shared",
-  });
-  console.log("Port created:", port);
+  // 4. Build the proxy URL: residential peer in Germany, one device held for this job
+  const built = JSON.parse(await callTool(client, "pool_build_proxy_url", {
+    proxyUsername: credentials.proxyUsername,
+    password: credentials.proxyPassword,
+    pool: "peer",
+    country: "de",
+    ipType: "residential",
+    rotation: "sticky",
+    sid: "job1",
+  }));
+  for (const warning of built.warnings) console.warn(warning);
 
-  // Extract port ID from response (parse the text output)
-  const portIdMatch = port.match(/Port ID: (\S+)/);
-  const portId = portIdMatch?.[1];
-  if (!portId) throw new Error("Failed to parse port ID");
-
-  // 5. Get connection string
-  const connStr = await callTool(client, "get_proxy_connection_string", {
-    portId,
-    format: "http_url",
-  });
-  console.log("Proxy URL:", connStr);
-
-  // 6. Check proxy is online
-  const status = await callTool(client, "get_port_status", { portId });
-  console.log("Status:", status);
-
-  // 7. Get current IP
-  const ip = await callTool(client, "get_port_ip", { portId });
-  console.log("Current IP:", ip);
-
-  // 8. Use the proxy (example with fetch)
-  const proxyUrl = connStr.trim();
-  console.log(`Use this proxy URL in your HTTP client: ${proxyUrl}`);
-
-  // 9. Rotate IP
-  const rotation = await callTool(client, "rotate_port", { portId });
-  console.log("Rotated:", rotation);
-
-  // 10. Verify new IP
-  const newIp = await callTool(client, "get_port_ip", { portId });
-  console.log("New IP:", newIp);
-
-  // 11. Clean up
-  const deleted = await callTool(client, "delete_port", { portId });
-  console.log("Deleted:", deleted);
+  // 5. Use built.proxyUrl in your HTTP client (undici ProxyAgent, axios, curl -x ...)
+  //    If the gateway refuses a request, ask what the code means:
+  console.log(await callTool(client, "pool_explain_error", { error: "E_NO_STOCK_COUNTRY" }));
 
   await client.close();
-}
-
-async function callTool(
-  client: Client,
-  name: string,
-  args?: Record<string, unknown>
-): Promise<string> {
-  const result = await client.callTool({ name, arguments: args || {} });
-  const text = result.content
-    .filter((c): c is { type: "text"; text: string } => c.type === "text")
-    .map((c) => c.text)
-    .join("\n");
-
-  // Check for structured errors
-  try {
-    const parsed = JSON.parse(text);
-    if (parsed.error) {
-      console.error(`Tool error [${parsed.tool}]: ${parsed.message}`);
-      if (parsed.retryable) {
-        console.log(`Suggestion: ${parsed.suggestion}`);
-      }
-      throw new Error(parsed.message);
-    }
-  } catch {
-    // Not JSON = success response (text output)
-  }
-
-  return text;
 }
 
 main().catch(console.error);
 ```
 
-## x402 Mode (Autonomous USDC Payments)
+Rules worth knowing (the builder enforces or warns about them):
+
+- `mbl` (carrier modems) exists only in US, GB, FR, NL, PL and GE (Georgia). For any other country use `peer`.
+- `sticky`, `hard` and `auto*` rotation persist across connections only with a `sid`.
+- Sticky holds the device, not the IP.
+
+## A dedicated port on a carrier modem
+
+```typescript
+// countryId comes from list_available_countries (an id, not a country code)
+const countries = await callTool(client, "list_available_countries");
+const countryId = countries.match(/United States \(US\).*countryId: (\S+)/)?.[1];
+
+const port = await callTool(client, "create_port", { countryId, expiresInDays: 1 });
+const portId = port.match(/^ID: (\S+)/m)?.[1];
+
+console.log(await callTool(client, "get_proxy_connection_string", { portId, protocol: "http" }));
+console.log(await callTool(client, "rotate_port", { portId }));   // another modem; port numbers change
+await callTool(client, "configure_auto_rotation", { portId, enabled: true, intervalMinutes: 30 });
+await callTool(client, "delete_port", { portId });
+```
+
+## x402 mode (optional: pay in USDC, no account)
 
 ```typescript
 const transport = new StdioClientTransport({
   command: "npx",
   args: ["-y", "@proxies-sx/mcp-server"],
-  env: {
-    AGENT_WALLET_KEY: process.env.WALLET_PRIVATE_KEY!,
-    PROXIES_API_URL: "https://api.proxies.sx/v1",
-    PREFERRED_NETWORK: "solana", // or "base"
-  },
+  env: { PATH: process.env.PATH!, AGENT_WALLET_KEY: process.env.WALLET_PRIVATE_KEY! }, // 0x key, wallet on Base
 });
 
-// Tools available in x402 mode:
-// x402_get_proxy      - Purchase proxy with USDC
-// x402_get_pricing    - Check pricing
-// x402_wallet_balance - Check wallet
-// x402_list_sessions  - List active proxies
-// x402_check_session  - Session details
-// x402_rotate_ip      - Rotate IP
-// x402_list_countries  - Available countries
+console.log(await callTool(client, "x402_pool_pricing"));      // live tiers and prices
+console.log(await callTool(client, "x402_wallet_balance"));    // USDC and gas on Base
 
-const proxy = await callTool(client, "x402_get_proxy", {
-  country: "US",
-  traffic_gb: 1,
-  tier: "shared",
-});
-// Automatically sends $4 USDC and returns proxy credentials
+// Sends an on-chain USDC payment, then returns one credential for the whole tier
+console.log(await callTool(client, "x402_get_pool_access", { tier: "peer", traffic_gb: 1 }));
 ```
 
-## Error Response Format
+## Errors
 
-All errors return structured JSON:
+A failing tool returns a normal MCP result with `isError: true` and a text such as:
 
-```json
-{
-  "error": true,
-  "tool": "x402_get_proxy",
-  "message": "Insufficient USDC balance",
-  "retryable": false,
-  "suggestion": "Top up your wallet with USDC on Base: 0x..."
-}
+```
+Error: API key missing required scope: ports:write
+What to do: Create a key that includes the ports:write scope at https://client.proxies.sx/account.
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `error` | boolean | Always `true` for errors |
-| `tool` | string | Tool name that failed |
-| `message` | string | Human-readable error |
-| `retryable` | boolean | Whether retry might succeed |
-| `suggestion` | string | What to do next |
+Wrong argument types or a missing required argument are rejected before the call, as an MCP `InvalidParams` protocol error.

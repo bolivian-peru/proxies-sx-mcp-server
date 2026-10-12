@@ -1,15 +1,15 @@
 # @proxies-sx/mcp-server - AI Agent Context
 
-> MCP server enabling AI agents to manage mobile 4G/5G proxy infrastructure on Proxies.sx
+> MCP server for Proxies.sx: residential and mobile proxies metered per GB. An agent reads live stock, gets its credentials, builds Pool Gateway proxy URLs, manages dedicated ports, Private Pools and Reserved IPs, reads usage and pricing, and opens support tickets.
 
 ## Quick Start
 
-### Installation
 ```bash
-npx @proxies-sx/mcp-server
+claude mcp add proxies-sx -e PROXIES_API_KEY=psx_your_api_key_here -- npx -y @proxies-sx/mcp-server
 ```
 
-### Configuration (Claude Desktop)
+Any other MCP client (Claude Desktop, Cursor, Windsurf, Cline):
+
 ```json
 {
   "mcpServers": {
@@ -24,222 +24,279 @@ npx @proxies-sx/mcp-server
 }
 ```
 
-## Two Authentication Modes
+Create the API key at https://client.proxies.sx/account and add GB at https://client.proxies.sx/purchase.
 
-### Mode 1: API Key (Account Required)
-- Create API key at https://client.proxies.sx/account
-- Set `PROXIES_API_KEY` environment variable
-- Scopes: ports:read, ports:write, ports:rotate, billing:read, etc.
+## Modes
 
-### Mode 2: x402 Autonomous Payments (No Account Needed)
-- Fund wallet with USDC on Base or Solana
-- Set `AGENT_WALLET_KEY` environment variable
-- Agents pay directly with crypto - no signup required
-- Uses HTTP 402 Payment Required protocol
+- **API key (standard):** `PROXIES_API_KEY`. An account with GB on it. Customer key scopes: ports:read, ports:write, ports:rotate, billing:read, account:read, account:write, traffic:read, tickets:read, tickets:write. `billing:write` (buying through the API) exists only for reseller and admin keys.
+- **x402 wallet (optional):** `AGENT_WALLET_KEY`, the 0x private key of a USDC wallet on Base. No account: the agent pays per GB on-chain.
+- **Both:** set both variables.
 
-## Available Tools (89 Total: 70 API-key + 19 x402)
+`PROXIES_API_URL` is optional. Default `https://api.proxies.sx`; a trailing `/v1` is accepted.
 
-### Account Management
-- `get_account_summary` - Balance, slots, traffic usage
-- `get_account_usage` - Detailed breakdown
+## Pool Gateway (the main product)
 
-### Port Management
-- `list_ports` - List all proxy ports
-- `create_port` - Create new port (country, city, carrier options)
-- `delete_port` - Delete a port
-- `get_port` - Get port details
-- `update_port_credentials` - Change login/password
-- `update_os_fingerprint` - Set OS spoofing (Windows, macOS, iOS, Android)
-- `reconfigure_port` - Change port location
-
-### Status & Monitoring
-- `get_port_status` - Online/offline status
-- `get_port_ip` - Current public IP address
-- `ping_port` - Test connectivity and latency
-- `speed_test_port` - Measure download/upload speed
-
-### IP Rotation
-- `rotate_port` - Rotate to new IP (5min cooldown for shared)
-- `check_rotation_availability` - Check if rotation available
-- `configure_auto_rotation` - Enable auto-rotation (5-1440 min interval)
-- `get_rotation_history` - View past rotations
-- `get_rotation_token_url` - Get public rotation URL
-
-### Billing & Purchases
-- `get_pricing` - Current pricing tiers and volume discounts
-- `calculate_price` - Calculate price with volume discounts for a specific GB amount
-- `purchase_shared_traffic` - Buy shared traffic in GB ($4/GB base)
-
-### Crypto Payments
-- `create_crypto_payment` - Create CoinGate order ($10-$1000)
-- `check_crypto_payment_status` - Check payment status
-- `get_pending_crypto_payments` - List pending payments
-- `cancel_crypto_payment` - Cancel a pending payment
-- `get_crypto_payment_info` - Supported currencies and info
-- Supports: BTC, ETH, USDT, USDC, LTC, DOGE, and 50+ more
-
-### Reference Data
-- `list_available_countries` - Available countries with live device counts
-
-### Utilities
-- `get_proxy_connection_string` - Generate a ready-to-use connection string for a port
-- `get_all_proxy_formats` - Get all proxy URL formats (curl, Python, env vars)
-- `get_os_fingerprint_options` - List available OS fingerprint values
-
-### Support Tickets
-- `create_support_ticket` - Submit a ticket to contact human support
-- `list_my_tickets` - List all your support tickets
-- `get_ticket` - Get ticket details with conversation history
-- `reply_to_ticket` - Reply to an existing ticket
-- `close_ticket` - Close a resolved ticket
-
-### Pool Gateway (16 tools: self-service + reseller / gateway access)
-- `pool_get_stock` - Live Pool Gateway availability: online endpoint counts per country (no auth)
-- `pool_build_proxy_url` - Build a gateway proxy URL from a proxyUsername + pak_ key via the username token DSL (pool/country/carrier/city/iptype/sid/rot; pure local, no network). `ipType` (mobile/residential/datacenter) hard-filters the `peer` pool to one exit class
-- `pool_list_sessions` - List live Pool Gateway sessions (traffic, exit IP, country); pakId scopes to one customer
-- `pool_close_session` - Close one live gateway session by sessionKey
-- `pool_get_my_credentials` - Get your own pool proxyUsername + ready-to-use HTTP/SOCKS5 connect strings
-- `pool_get_my_stats` - Get your own pool usage (traffic, active connections) + aggregated pool health
-- `pool_set_proxy_password` - Set or update your proxy auth password (separate from account login, min 6 chars)
-- `pool_mint_key` - Mint a new Pool Access Key (pak_) for a customer (reseller role required)
-- `pool_list_keys` - List your Pool Access Keys (masked)
-- `pool_update_key` - Update a key's label/enabled/trafficCapGB/expiresAt/qualityTier (reseller)
-- `pool_topup_key` - Add traffic cap and/or extend expiry on a pak_ key (atomic)
-- `pool_regenerate_key` - Rotate a key's secret pak_ value (reseller)
-- `pool_reveal_key` - Reveal the full pak_ secret, audit-logged as a "reveal" event (reseller)
-- `pool_delete_key` - Delete a Pool Access Key (reseller)
-- `pool_key_usage` - Daily in/out MB bandwidth time-series for one key (default 30 days, max 365) (reseller)
-- `pool_key_audit` - Forensic audit log for one key: create/update/topup/regenerate/reveal/delete/gateway-auth events (reseller)
-
-### Ops (admin/ops agents - requires admin API key with ops:* scopes; capped + audited)
-- `ops_get_user` - Customer 360 view: balance, gateway usage, ports, farmer note
-- `ops_get_user_audit` - Recent ops-agent actions taken on a user
-- `ops_reconcile_payments` - Read-only Stripe-vs-DB payment view for a user
-- `ops_list_tickets` - List support tickets (admin view)
-- `ops_reply_ticket` - Post an admin reply to a ticket (reason required)
-- `ops_set_slots` - Set a user's port slot limits (capped, reason required)
-- `ops_credit_balance` - Credit a user's balance in USD (capped + daily budget; large amounts go to human approval)
-- `ops_email_user` - Send a personalized email to one user (rate-capped, reason required)
-- `ops_list_farmers` - List farmer AI notes (shared operational memory)
-- `ops_get_farmer` - Farmer fleet funnel (total/online/verified/listed/routable) + AI note
-- `ops_write_farmer_note` - Write/append a farmer AI note shared with future AI sessions
-
-### x402 Tools (Autonomous Mode)
-- `x402_get_proxy` - Purchase proxy with USDC
-- `x402_get_pricing` - Calculate cost
-- `x402_wallet_balance` - Check wallet balance
-- `x402_list_sessions` - List active sessions
-- `x402_check_session` - Session details
-- `x402_rotate_ip` - Rotate IP
-- `x402_list_countries` - Available countries
-- `x402_list_cities` - Cities in a country
-- `x402_list_carriers` - Carriers in a country
-- `x402_extend_session` - Extend session duration for FREE (duration-only top-up via /v1/x402/manage/session/topup; accepts session ID or x402s_ token)
-- `x402_service_status` - Health check
-
-### x402 Pool Gateway (wallet-only, one credential for every country in your tier)
-- `x402_get_pool_access` - Buy Pool Gateway access with USDC (one credential, username DSL, HTTP :7000, mbl tier $4/GB, 6 countries: US/GB/FR/NL/PL/GE)
-- `x402_pool_credit` - Check remaining pool credit (GB) for a pool session
-- `x402_pool_topup` - Add GB (paid, $4/GB) and/or duration (free) to a pool session
-- `x402_pool_regenerate` - Rotate the pool credential secret (same username, new password)
-- `x402_pool_connection` - Re-emit pool proxy credentials (recovery)
-- `x402_pool_usage` - Per-day bandwidth usage (MB) for a pool session (default 30 days, max 365)
-- `x402_pool_pricing` - Pool Gateway tier catalog (no auth, no wallet)
-- `get_pool_stock` - Public pool stock: online endpoint counts per country, no IPs (no auth)
-
-### x402 Session Management
-- `get_x402_session` - Session details by token
-- `list_x402_ports` - Ports in session
-- `get_x402_port_status` - Port status
-- `get_sessions_by_wallet` - Sessions by wallet
-- `get_session_status` - Quick session status
-- `replace_x402_port` - Replace offline port (free, max 3 per session)
-- `calculate_x402_topup` - Preview cost to add traffic/duration
-- `topup_x402_session` - Pay to extend session (USDC on Base/Solana)
-
-### Support
-- `create_support_ticket` - Create ticket
-- `list_my_tickets` - List tickets
-- `get_ticket` - Get ticket details
-- `reply_to_ticket` - Reply to ticket
-- `close_ticket` - Close a resolved ticket
-
-## Pricing
-
-Duration is always FREE — you only pay for traffic.
-
-### Shared
-- Traffic: $4.00/GB
-- Min purchase: 0.1 GB ($0.40)
-
-## x402 Payment Flow
+One endpoint: `gw.proxies.sx`, HTTP port 7000, SOCKS5 port 7001. The username carries the routing:
 
 ```
-1. Agent requests proxy → GET /v1/x402/proxy
-2. Server returns 402 with payment requirements
-3. Agent signs USDC transaction (viem library)
-4. Agent retries with payment-signature header
-5. Server verifies payment on-chain
-6. Server returns proxy credentials + session token
+psx_<account>-<pool>-<country>[-iptype-<class>][-carrier-<name>][-city-<name>][-state-<code>][-asn-<number>][-sid-<id>][-rot-<mode>][-failover-<policy>][-ttl-<seconds>]
 ```
 
-### Supported Networks
-- **Base**: USDC at 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
-- **Solana**: USDC at EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+Rules:
+- pool `peer`: the main network, residential and mobile, most countries. pool `mbl`: carrier modems in exactly US, GB, FR, NL, PL, GE. GE is Georgia, not Germany: `mbl-de` never works, use `peer-de`. `any` / `best`: the gateway chooses.
+- iptype: `mobile`, `residential`, `isp`. The ISP (static) class is served only when named.
+- rot: `sticky` and `hard` hold one device; `auto5`, `auto10`, `auto20`, `auto60` move to another device on that interval (auto10 is the default); `ondemand` picks again per connection.
+- `sticky`, `hard` and `auto*` persist across connections only with `-sid-<id>` (lowercase letters, digits, `_`). `-session-` is ignored without an error.
+- Sticky holds the device, not the IP: a mobile carrier can change the exit IP.
+- Limits per account: 500 concurrent connections, 250 sessions.
+- Password: the proxy password from `pool_get_my_credentials`, or a `pak_` key. Not the account login password.
+- Price: per GB, lower per GB on larger purchases, time is free. Read it live with `get_pricing`.
 
-## Example Conversations
+Typical flow:
 
-### Get a US Proxy (x402 Mode)
 ```
-User: I need a US mobile proxy for web scraping
-Agent: [Uses x402_get_pricing, x402_get_proxy]
-
-Purchased proxy for 0.40 USDC (0.1 GB):
-HTTP: http://x402_abc:xyz@tmcal1.ddns.net:8500
-SOCKS5: socks5://x402_abc:xyz@tmcal1.ddns.net:5500
-```
-
-### Create Port (API Key Mode)
-```
-User: Create a shared proxy in Poland
-Agent: [Uses list_available_countries, create_port]
-
-Port created in Poland:
-HTTP: http://user:pass@proxy.example.com:8080
+pool_get_stock {country: "de"}
+pool_get_my_credentials
+pool_build_proxy_url {proxyUsername, password, pool: "peer", country: "de", ipType: "residential", rotation: "sticky", sid: "job1"}
+-> http://psx_abc123-peer-de-iptype-residential-sid-job1-rot-sticky:PASSWORD@gw.proxies.sx:7000
 ```
 
-### Rotate IP
+Gateway error codes (pass the text to `pool_explain_error`): E_AUTH_REQUIRED, E_AUTH_INVALID (wrong proxy password), E_BALANCE_EXHAUSTED (no traffic left, the password is fine), E_CAP_EXCEEDED, E_RATE_LIMITED_AUTH, E_RATE_LIMITED_CONN, E_SESSION_LIMIT, E_NO_STOCK_COUNTRY, E_STOCK_DEGRADED, E_SSRF_BLOCKED, E_WRONG_PORT, E_INTERNAL.
+
+## Tools
+
+<!-- tools:start -->
+Generated from the code of version 3.0.0 by `npm run build:manifest`. Do not edit by hand.
+
+**Pool Gateway**
+
+| Tool | What it does |
+|---|---|
+| `pool_get_stock` | Get live Pool Gateway stock, no account needed. Also listed in wallet mode. |
+| `pool_get_facets` | List the cities, states, carriers (with ASN and class) and IP classes that have stock in one country, with counts, no account needed. Also listed in wallet mode. |
+| `pool_build_proxy_url` | Build a ready-to-use Pool Gateway proxy URL (gw.proxies.sx, HTTP 7000 or SOCKS5 7001). Also listed in wallet mode. |
+| `pool_explain_error` | Explain a Pool Gateway error and say what to do about it. Also listed in wallet mode. |
+| `pool_get_my_credentials` | Get your Pool Gateway proxy username and proxy password with ready HTTP and SOCKS5 URLs. |
+| `pool_set_proxy_password` | Set a new proxy password (at least 6 characters). |
+| `pool_get_my_stats` | Get your own Pool Gateway traffic and open connections, plus the health score of the pool and how many devices are connected to it. |
+| `pool_list_sessions` | List your saved Pool Gateway sessions: pool, country, carrier, rotation mode, bytes and last activity. |
+| `pool_close_session` | Close one Pool Gateway session by the sessionKey from pool_list_sessions. |
+| `pool_close_all_sessions` | Close every saved Pool Gateway session of the account. |
+
+**Private Pool and Reserved IPs**
+
+| Tool | What it does |
+|---|---|
+| `private_pool_list` | List your Private Pools with their countries, status, gateway username, connection strings with the password masked (private_pool_reveal shows the key) and remaining GB. |
+| `private_pool_build` | Create a Private Pool paid from the account's existing GB balance: no purchase, traffic is metered from the same balance. |
+| `private_pool_reveal` | Show the gateway password (pak_ key) of a Private Pool. |
+| `private_pool_usage` | Get the traffic of a Private Pool per day, in MB. |
+| `reserved_ip_list` | List the Reserved IPs a Private Pool holds: country, class, carrier, city, rotation mode, whether the device is online, the exit IP last seen, and connection strings with the password masked. |
+| `reserved_ip_reserve` | Reserve one device for a Private Pool so no other customer is routed through it, and get its connection strings with the password masked. |
+| `reserved_ip_rotate` | Move a Reserved IP to a different device in the same country now. |
+| `reserved_ip_extend` | Change how long a Reserved IP is kept without traffic. |
+| `reserved_ip_set_rotation` | Set whether a Reserved IP moves to another device on a schedule: off (hold the device, the default) or every 5, 10, 20 or 60 minutes. |
+| `reserved_ip_release` | Give a Reserved IP back to the shared pool. |
+
+**Account**
+
+| Tool | What it does |
+|---|---|
+| `get_account_summary` | Get the account balance, free port slots, traffic bought and left, and any account alerts. |
+| `get_account_usage` | Get traffic purchased, used and still available, split into Pool Gateway traffic and dedicated-port traffic. |
+
+**Billing**
+
+| Tool | What it does |
+|---|---|
+| `get_pricing` | Get the live price per GB, the volume discounts, the free port-slot tiers and your current tier. |
+| `calculate_price` | Calculate what a GB amount costs with the volume discount applied. |
+| `purchase_shared_traffic` | Buy traffic in GB from the account balance. |
+| `coupon_validate` | Check whether a coupon code is valid for an order, without using it. |
+| `coupon_redeem` | Redeem a standalone coupon that grants free GB or port slots to the account. |
+| `get_payment_history` | List the account's past payments and crypto top-up orders. |
+
+**Crypto payments**
+
+| Tool | What it does |
+|---|---|
+| `create_crypto_payment` | Create a crypto order that tops up the account balance and return its hosted payment link. |
+| `check_crypto_payment_status` | Check whether a crypto order is still unpaid, confirming, paid, expired or cancelled, and whether the balance was credited. |
+| `get_pending_crypto_payments` | List the account's crypto orders that are not finished yet, with their payment links. |
+| `cancel_crypto_payment` | Cancel a crypto order that has not been paid yet. |
+| `get_crypto_payment_info` | Check whether crypto top-ups are available right now and which currencies the payment page accepts. |
+
+**Dedicated ports**
+
+| Tool | What it does |
+|---|---|
+| `list_available_countries` | List the countries where a dedicated port can be created right now, with the countryId create_port needs. |
+| `list_ports` | List your dedicated ports with status, country, carrier, expiry and port ids. |
+| `get_port` | Get one dedicated port with its location and ready-to-use HTTP and SOCKS5 connection strings (contains the port password). |
+| `create_port` | Create a dedicated port on a carrier modem and return its connection strings. |
+| `delete_port` | Delete a dedicated port and free its slot. |
+| `update_port_credentials` | Change the login and/or password of a dedicated port. |
+| `update_os_fingerprint` | Set the OS fingerprint (TCP/IP signature) a dedicated port presents. |
+| `reconfigure_port` | Move a dedicated port to another country, carrier or city. |
+| `extend_port` | Add hours to a dedicated port's expiry. |
+
+**Port status**
+
+| Tool | What it does |
+|---|---|
+| `get_port_status` | Check whether a dedicated port is online, offline or expired. |
+| `get_port_ip` | Get the server address a dedicated port listens on. |
+| `ping_port` | Test that a dedicated port answers and measure its latency. |
+| `speed_test_port` | Run a speed test through a dedicated port (download, upload, ping). |
+
+**Port rotation**
+
+| Tool | What it does |
+|---|---|
+| `rotate_port` | Move a dedicated port to another modem in the same location. |
+| `check_rotation_availability` | Check whether a dedicated port can be rotated now, how long the cooldown still runs and how many other modems are free. |
+| `configure_auto_rotation` | Turn automatic rotation of a dedicated port on or off and set its interval. |
+| `get_rotation_history` | Get the past rotations of a dedicated port: when, how triggered, the location it moved to and whether it worked. |
+| `get_rotation_token_url` | Get the public rotation link of a dedicated port. |
+
+**Utilities**
+
+| Tool | What it does |
+|---|---|
+| `get_proxy_connection_string` | Build the HTTP or SOCKS5 connection string of a dedicated port (contains the port password). |
+| `get_all_proxy_formats` | Get a dedicated port in every common format: URLs, host:port, environment variables, curl, Python and Node.js snippets, and its public rotation link. |
+| `get_service_status` | Check whether Proxies.sx is healthy right now: open Pool Gateway incidents, the state of the API, gateway and relay, and recent uptime. Also listed in wallet mode. |
+| `get_os_fingerprint_options` | List the OS fingerprint values create_port and update_os_fingerprint accept. |
+
+**Support**
+
+| Tool | What it does |
+|---|---|
+| `create_support_ticket` | Open a support ticket that a person at Proxies.sx reads and answers. |
+| `list_my_tickets` | List your support tickets with their status and IDs. |
+| `get_ticket` | Get one support ticket with the original message and every reply. |
+| `reply_to_ticket` | Add a reply to one of your support tickets. |
+| `close_ticket` | Close one of your support tickets once the problem is solved. |
+
+**Pool access keys (reseller accounts)**
+
+| Tool | What it does |
+|---|---|
+| `pool_mint_key` | Create a Pool Access Key (pak_) for one of your customers; it is used as the proxy password. |
+| `pool_list_keys` | List your Pool Access Keys with usage, cap and expiry; the key values are masked. |
+| `pool_topup_key` | Add GB to a Pool Access Key's cap and/or extend its expiry in one step. |
+| `pool_update_key` | Change a Pool Access Key's label, enabled flag, cap, expiry or quality tier. |
+| `pool_regenerate_key` | Replace the secret pak_ value of a Pool Access Key. |
+| `pool_reveal_key` | Show the full pak_ value of a Pool Access Key. |
+| `pool_delete_key` | Delete a Pool Access Key. |
+| `pool_key_usage` | Get the traffic of one Pool Access Key per day, in MB. |
+| `pool_key_audit` | Get the audit log of one Pool Access Key, newest first: created, changed, topped up, regenerated, revealed, deleted, and gateway logins that worked or failed. |
+
+**x402 session management**
+
+| Tool | What it does |
+|---|---|
+| `get_x402_session` | Get details of your x402 session including all ports. |
+| `list_x402_ports` | List all ports in your x402 session with connection strings and expiration times |
+| `get_x402_port_status` | Get detailed status of a specific port including traffic usage and connection info |
+| `get_sessions_by_wallet` | List all x402 sessions associated with your wallet address. |
+| `get_session_status` | Get quick status check for a session including traffic usage and expiration |
+| `replace_x402_port` | Replace an offline port of an x402 session with a new port on another device, at no charge. |
+| `calculate_x402_topup` | Calculate what it costs to add traffic and/or time to an x402 session. |
+| `topup_x402_session` | Add traffic and/or time to an x402 session. |
+
+**Ops (admin keys only)**
+
+| Tool | What it does |
+|---|---|
+| `ops_get_user` | Customer 360 view: balance, pool-gateway usage, ports, and (if a farmer) their AI note. |
+| `ops_get_user_audit` | Recent ops-agent actions taken on this user. |
+| `ops_reconcile_payments` | Read-only Stripe-vs-DB payment view for a user (confirmed total + pending). |
+| `ops_list_tickets` | List support tickets (admin view). |
+| `ops_reply_ticket` | Post an admin reply to a ticket, optionally emailing the customer. |
+| `ops_set_slots` | Set a user's port slot limit (capped). |
+| `ops_credit_balance` | Credit a user's balance in USD (admin credit). |
+| `ops_email_user` | Send a personalized email to one user (hourly rate-capped). |
+| `ops_list_farmers` | List farmer AI notes (shared operational memory). |
+| `ops_get_farmer` | Farmer fleet funnel (total/online/verified/listed/routable) + AI note. |
+| `ops_write_farmer_note` | Write/append a farmer AI note (situation, nextAction, free note) — shared with future AI sessions. |
+
+**x402 wallet (optional, no account)**
+
+| Tool | What it does |
+|---|---|
+| `x402_get_proxy` | Buy a dedicated mobile proxy on one carrier modem by paying USDC from the agent wallet; no account needed. |
+| `x402_get_pricing` | Get the live x402 price per GB, the smallest purchase, the allowed duration and the payment networks, and compare the cost of a purchase with the wallet balance. |
+| `x402_list_sessions` | List the active x402 proxy sessions this wallet bought from this machine, with location, expiry and proxy host. |
+| `x402_check_session` | Get status, time left, traffic used and the connection strings of an x402 proxy session. |
+| `x402_wallet_balance` | Get the agent wallet address and its USDC and ETH (gas) balance on the Base network. |
+| `x402_rotate_ip` | Move an x402 proxy to another modem so it gets a different exit IP. |
+| `x402_list_countries` | List the countries where x402_get_proxy can create a proxy right now, with the number of free modems. |
+| `x402_extend_session` | Add hours to an x402 proxy session. |
+| `x402_service_status` | Check that the x402 payment service is up, and show the wallet balance and how many sessions are active or about to expire. |
+| `x402_get_pool_access` | Buy Pool Gateway traffic by paying USDC from the agent wallet; no account needed. |
+| `x402_pool_credit` | Get the GB bought, used and left on an x402 pool session. |
+| `x402_pool_topup` | Add GB and/or time to an x402 pool session. |
+| `x402_pool_regenerate` | Replace the password of an x402 pool credential, for example after a leak. |
+| `x402_pool_connection` | Show the gateway host, port, username and password of an x402 pool session again. |
+| `x402_pool_usage` | Get the traffic of an x402 pool session per day, in MB. |
+| `x402_pool_pricing` | Get the Pool Gateway tiers that can be bought with x402 and their live price per GB and smallest purchase. |
+<!-- tools:end -->
+
+## Tool errors
+
+A failing tool returns `isError: true`. For a missing or revoked key (401), a missing scope (403), a rate limit (429) and server errors (5xx) the text ends with a `What to do:` line. Keys and passwords are masked in error text.
+
+## Example conversations
+
+### A proxy in a country without modems
 ```
-User: Rotate the IP on my main proxy
-Agent: [Uses list_ports, rotate_port]
+User: I need a residential proxy in Germany that keeps the same device.
+Agent: [pool_get_stock, pool_get_my_credentials, pool_build_proxy_url]
 
-IP rotated successfully! New IP: 185.123.xxx.xxx
+http://psx_abc123-peer-de-iptype-residential-sid-job1-rot-sticky:PASSWORD@gw.proxies.sx:7000
 ```
 
-## API Base URL
-`https://api.proxies.sx/v1`
+### A dedicated port on a carrier modem
+```
+User: Create a dedicated mobile port in Poland.
+Agent: [list_available_countries, create_port]
 
-## Key Endpoints
+Port created:
+HTTP: http://user:pass@<server>:<port>
+```
 
-| Endpoint | Description |
-|----------|-------------|
-| GET /v1/ports | List ports |
-| POST /v1/ports | Create port |
-| POST /v1/ports/:id/rotate | Rotate IP |
-| GET /v1/account | Account summary |
-| GET/POST /v1/x402/proxy | Purchase (402 flow) |
-| GET /v1/x402/countries | Available countries |
-| POST /v1/x402/manage/ports/replace | Replace offline port (free, max 3) |
-| GET /v1/x402/manage/session/topup/calculate | Preview top-up cost |
-| POST /v1/x402/manage/session/topup | Pay to extend session |
+### Move a dedicated port to another modem
+```
+User: Rotate my main port.
+Agent: [list_ports, rotate_port]
+
+The port is on another device now and its port numbers have changed. The API does not return the exit IP (x.x): send a request through the proxy to see it.
+```
+
+### Pay with a wallet (x402)
+```
+User: Buy 1 GB of pool access with my agent wallet.
+Agent: [x402_pool_pricing, x402_wallet_balance, x402_get_pool_access]
+
+One credential for gw.proxies.sx:7000, valid for every country of the tier.
+```
+
+## x402 payment flow (optional path)
+
+```
+1. GET /v1/x402/pool or /v1/x402/proxy        -> 402 with the payment options
+2. the server pays USDC on Base from the agent wallet
+3. the same request again with header Payment-Signature: <transaction hash>
+4. the API verifies the payment and returns credentials and a session token
+```
 
 ## Links
 
 - Website: https://proxies.sx
-- Customer Portal: https://client.proxies.sx
-- API Documentation: https://proxies.sx/docs
-- MCP Integration: https://proxies.sx/mcp
-- x402 Protocol: https://proxies.sx/x402
-- npm Package: https://www.npmjs.com/package/@proxies-sx/mcp-server
+- Customer dashboard: https://client.proxies.sx
+- Agent documentation: https://agents.proxies.sx/
+- Pool Gateway guide: https://agents.proxies.sx/pool/skill.md
+- npm package: https://www.npmjs.com/package/@proxies-sx/mcp-server
 - GitHub: https://github.com/bolivian-peru/proxies-sx-mcp-server
 - Support: maya@proxies.sx

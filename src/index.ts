@@ -3,11 +3,11 @@
 /**
  * Proxies.sx MCP Server - Entry Point
  *
- * MCP (Model Context Protocol) server for AI agents to manage
- * mobile proxy infrastructure on Proxies.sx
+ * MCP (Model Context Protocol) server for AI agents to use Proxies.sx
+ * residential and mobile proxies: Pool Gateway, dedicated ports, billing, support
  *
  * Usage:
- *   PROXIES_API_KEY=psx_xxx npx proxies-sx-mcp
+ *   PROXIES_API_KEY=psx_xxx npx -y @proxies-sx/mcp-server
  *
  * Or add to Claude Desktop config:
  *   {

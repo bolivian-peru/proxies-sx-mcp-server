@@ -17,7 +17,8 @@ import { paymentToolDefinitions, createPaymentToolHandlers, paymentSchemas } fro
 import { supportToolDefinitions, createSupportToolHandlers, supportSchemas } from './support.js';
 import { x402SessionToolDefinitions, createX402SessionToolHandlers, x402SessionSchemas } from './x402-session.js';
 import { opsToolDefinitions, createOpsToolHandlers, opsSchemas } from './ops.js';
-import { poolToolDefinitions, createPoolToolHandlers, poolSchemas } from './pool.js';
+import { poolToolDefinitions, poolKeyToolDefinitions, createPoolToolHandlers, poolSchemas } from './pool.js';
+import { privatePoolToolDefinitions, createPrivatePoolToolHandlers, privatePoolSchemas } from './private-pool.js';
 
 // Export everything
 export * from './account.js';
@@ -32,24 +33,44 @@ export * from './support.js';
 export * from './x402-session.js';
 export * from './ops.js';
 export * from './pool.js';
+export * from './private-pool.js';
+
+/**
+ * Tools by category, in the order a client lists them. The catalogue
+ * (tools.json, README) is generated from this, so it cannot drift.
+ */
+export const toolGroups = [
+  { category: 'Pool Gateway', tools: poolToolDefinitions },
+  { category: 'Private Pool and Reserved IPs', tools: privatePoolToolDefinitions },
+  { category: 'Account', tools: accountToolDefinitions },
+  { category: 'Billing', tools: billingToolDefinitions },
+  { category: 'Crypto payments', tools: paymentToolDefinitions },
+  { category: 'Dedicated ports', tools: [...referenceToolDefinitions, ...portToolDefinitions] },
+  { category: 'Port status', tools: statusToolDefinitions },
+  { category: 'Port rotation', tools: rotationToolDefinitions },
+  { category: 'Utilities', tools: utilityToolDefinitions },
+  { category: 'Support', tools: supportToolDefinitions },
+  { category: 'Pool access keys (reseller accounts)', tools: poolKeyToolDefinitions },
+  { category: 'x402 session management', tools: x402SessionToolDefinitions },
+  { category: 'Ops (admin keys only)', tools: opsToolDefinitions },
+] as const;
 
 /**
  * All tool definitions combined
  */
-export const allToolDefinitions = [
-  ...accountToolDefinitions,
-  ...portToolDefinitions,
-  ...statusToolDefinitions,
-  ...rotationToolDefinitions,
-  ...billingToolDefinitions,
-  ...referenceToolDefinitions,
-  ...utilityToolDefinitions,
-  ...paymentToolDefinitions,
-  ...supportToolDefinitions,
-  ...x402SessionToolDefinitions,
-  ...opsToolDefinitions,
-  ...poolToolDefinitions,
-] as const;
+export const allToolDefinitions = toolGroups.flatMap(group => [...group.tools]);
+
+/**
+ * Tools that call only public routes (or none). They are registered in every
+ * mode, so a wallet-only agent can also read stock and build proxy URLs.
+ */
+export const PUBLIC_TOOL_NAMES: readonly string[] = [
+  'pool_get_stock',
+  'pool_get_facets',
+  'pool_build_proxy_url',
+  'pool_explain_error',
+  'get_service_status',
+];
 
 /**
  * All validation schemas combined
@@ -67,6 +88,7 @@ export const allSchemas = {
   ...x402SessionSchemas,
   ...opsSchemas,
   ...poolSchemas,
+  ...privatePoolSchemas,
 } as const;
 
 /**
@@ -80,129 +102,24 @@ export type ToolHandler = (args: Record<string, unknown>) => Promise<string>;
 export type ToolHandlers = Record<string, ToolHandler>;
 
 /**
- * Create all tool handlers
+ * Create all tool handlers. Arguments reach a handler only after the tool's
+ * zod schema accepted them (see server.ts), so the handler's own argument
+ * type holds at run time.
  */
 export function createAllToolHandlers(api: ProxiesApi, baseUrl: string): ToolHandlers {
-  const accountHandlers = createAccountToolHandlers(api);
-  const portHandlers = createPortToolHandlers(api);
-  const statusHandlers = createStatusToolHandlers(api);
-  const rotationHandlers = createRotationToolHandlers(api, baseUrl);
-  const billingHandlers = createBillingToolHandlers(api);
-  const referenceHandlers = createReferenceToolHandlers(api);
-  const utilityHandlers = createUtilityToolHandlers(api, baseUrl);
-  const paymentHandlers = createPaymentToolHandlers(api);
-  const supportHandlers = createSupportToolHandlers(api);
-  const x402SessionHandlers = createX402SessionToolHandlers(api, baseUrl);
-  const opsHandlers = createOpsToolHandlers(api);
-  const poolHandlers = createPoolToolHandlers(api);
-
   return {
-    // Account tools
-    get_account_summary: () => accountHandlers.get_account_summary(),
-    get_account_usage: () => accountHandlers.get_account_usage(),
-
-    // Port tools
-    list_ports: (args) => portHandlers.list_ports(args as Parameters<typeof portHandlers.list_ports>[0]),
-    get_port: (args) => portHandlers.get_port(args as Parameters<typeof portHandlers.get_port>[0]),
-    create_port: (args) => portHandlers.create_port(args as Parameters<typeof portHandlers.create_port>[0]),
-    delete_port: (args) => portHandlers.delete_port(args as Parameters<typeof portHandlers.delete_port>[0]),
-    update_port_credentials: (args) => portHandlers.update_port_credentials(args as Parameters<typeof portHandlers.update_port_credentials>[0]),
-    update_os_fingerprint: (args) => portHandlers.update_os_fingerprint(args as Parameters<typeof portHandlers.update_os_fingerprint>[0]),
-    reconfigure_port: (args) => portHandlers.reconfigure_port(args as Parameters<typeof portHandlers.reconfigure_port>[0]),
-
-    // Status tools
-    get_port_status: (args) => statusHandlers.get_port_status(args as Parameters<typeof statusHandlers.get_port_status>[0]),
-    get_port_ip: (args) => statusHandlers.get_port_ip(args as Parameters<typeof statusHandlers.get_port_ip>[0]),
-    ping_port: (args) => statusHandlers.ping_port(args as Parameters<typeof statusHandlers.ping_port>[0]),
-    speed_test_port: (args) => statusHandlers.speed_test_port(args as Parameters<typeof statusHandlers.speed_test_port>[0]),
-
-    // Rotation tools
-    rotate_port: (args) => rotationHandlers.rotate_port(args as Parameters<typeof rotationHandlers.rotate_port>[0]),
-    check_rotation_availability: (args) => rotationHandlers.check_rotation_availability(args as Parameters<typeof rotationHandlers.check_rotation_availability>[0]),
-    configure_auto_rotation: (args) => rotationHandlers.configure_auto_rotation(args as Parameters<typeof rotationHandlers.configure_auto_rotation>[0]),
-    get_rotation_history: (args) => rotationHandlers.get_rotation_history(args as Parameters<typeof rotationHandlers.get_rotation_history>[0]),
-    get_rotation_token_url: (args) => rotationHandlers.get_rotation_token_url(args as Parameters<typeof rotationHandlers.get_rotation_token_url>[0]),
-
-    // Billing tools (Slots are FREE - Jan 2026 business model update)
-    get_pricing: () => billingHandlers.get_pricing(),
-    calculate_price: (args) => billingHandlers.calculate_price(args as Parameters<typeof billingHandlers.calculate_price>[0]),
-    purchase_shared_traffic: (args) => billingHandlers.purchase_shared_traffic(args as Parameters<typeof billingHandlers.purchase_shared_traffic>[0]),
-
-    // Reference tools (cities, carriers, regions removed - 2026-01-03)
-    list_available_countries: (args) => referenceHandlers.list_available_countries(args as Parameters<typeof referenceHandlers.list_available_countries>[0]),
-
-    // Utility tools
-    get_proxy_connection_string: (args) => utilityHandlers.get_proxy_connection_string(args as Parameters<typeof utilityHandlers.get_proxy_connection_string>[0]),
-    get_all_proxy_formats: (args) => utilityHandlers.get_all_proxy_formats(args as Parameters<typeof utilityHandlers.get_all_proxy_formats>[0]),
-    get_os_fingerprint_options: () => utilityHandlers.get_os_fingerprint_options(),
-
-    // Payment tools (CoinGate crypto)
-    create_crypto_payment: (args) => paymentHandlers.create_crypto_payment(args as Parameters<typeof paymentHandlers.create_crypto_payment>[0]),
-    check_crypto_payment_status: (args) => paymentHandlers.check_crypto_payment_status(args as Parameters<typeof paymentHandlers.check_crypto_payment_status>[0]),
-    get_pending_crypto_payments: () => paymentHandlers.get_pending_crypto_payments(),
-    cancel_crypto_payment: (args) => paymentHandlers.cancel_crypto_payment(args as Parameters<typeof paymentHandlers.cancel_crypto_payment>[0]),
-    get_crypto_payment_info: () => paymentHandlers.get_crypto_payment_info(),
-
-    // Support tools (tickets)
-    create_support_ticket: (args) => supportHandlers.create_support_ticket(args as Parameters<typeof supportHandlers.create_support_ticket>[0]),
-    list_my_tickets: () => supportHandlers.list_my_tickets(),
-    get_ticket: (args) => supportHandlers.get_ticket(args as Parameters<typeof supportHandlers.get_ticket>[0]),
-    reply_to_ticket: (args) => supportHandlers.reply_to_ticket(args as Parameters<typeof supportHandlers.reply_to_ticket>[0]),
-    close_ticket: (args) => supportHandlers.close_ticket(args as Parameters<typeof supportHandlers.close_ticket>[0]),
-
-    // X402 Session Management tools
-    get_x402_session: (args) => x402SessionHandlers.get_x402_session(args as Parameters<typeof x402SessionHandlers.get_x402_session>[0]),
-    list_x402_ports: (args) => x402SessionHandlers.list_x402_ports(args as Parameters<typeof x402SessionHandlers.list_x402_ports>[0]),
-    get_x402_port_status: (args) => x402SessionHandlers.get_x402_port_status(args as Parameters<typeof x402SessionHandlers.get_x402_port_status>[0]),
-    get_sessions_by_wallet: (args) => x402SessionHandlers.get_sessions_by_wallet(args as Parameters<typeof x402SessionHandlers.get_sessions_by_wallet>[0]),
-    get_session_status: (args) => x402SessionHandlers.get_session_status(args as Parameters<typeof x402SessionHandlers.get_session_status>[0]),
-    replace_x402_port: (args) => x402SessionHandlers.replace_x402_port(args as Parameters<typeof x402SessionHandlers.replace_x402_port>[0]),
-    calculate_x402_topup: (args) => x402SessionHandlers.calculate_x402_topup(args as Parameters<typeof x402SessionHandlers.calculate_x402_topup>[0]),
-    topup_x402_session: (args) => x402SessionHandlers.topup_x402_session(args as Parameters<typeof x402SessionHandlers.topup_x402_session>[0]),
-
-    // Ops-agent tools (admin-scoped, capped, audited)
-    ops_get_user: (args) => opsHandlers.ops_get_user(args as Parameters<typeof opsHandlers.ops_get_user>[0]),
-    ops_get_user_audit: (args) => opsHandlers.ops_get_user_audit(args as Parameters<typeof opsHandlers.ops_get_user_audit>[0]),
-    ops_reconcile_payments: (args) => opsHandlers.ops_reconcile_payments(args as Parameters<typeof opsHandlers.ops_reconcile_payments>[0]),
-    ops_list_tickets: (args) => opsHandlers.ops_list_tickets(args as Parameters<typeof opsHandlers.ops_list_tickets>[0]),
-    ops_reply_ticket: (args) => opsHandlers.ops_reply_ticket(args as Parameters<typeof opsHandlers.ops_reply_ticket>[0]),
-    ops_set_slots: (args) => opsHandlers.ops_set_slots(args as Parameters<typeof opsHandlers.ops_set_slots>[0]),
-    ops_credit_balance: (args) => opsHandlers.ops_credit_balance(args as Parameters<typeof opsHandlers.ops_credit_balance>[0]),
-    ops_email_user: (args) => opsHandlers.ops_email_user(args as Parameters<typeof opsHandlers.ops_email_user>[0]),
-    ops_list_farmers: (args) => opsHandlers.ops_list_farmers(args as Parameters<typeof opsHandlers.ops_list_farmers>[0]),
-    ops_get_farmer: (args) => opsHandlers.ops_get_farmer(args as Parameters<typeof opsHandlers.ops_get_farmer>[0]),
-    ops_write_farmer_note: (args) => opsHandlers.ops_write_farmer_note(args as Parameters<typeof opsHandlers.ops_write_farmer_note>[0]),
-
-    // Pool Gateway tools (flagship one-port product)
-    pool_get_stock: () => poolHandlers.pool_get_stock(),
-    pool_build_proxy_url: (args) => poolHandlers.pool_build_proxy_url(args as Parameters<typeof poolHandlers.pool_build_proxy_url>[0]),
-    pool_list_sessions: (args) => poolHandlers.pool_list_sessions(args as Parameters<typeof poolHandlers.pool_list_sessions>[0]),
-    pool_close_session: (args) => poolHandlers.pool_close_session(args as Parameters<typeof poolHandlers.pool_close_session>[0]),
-    pool_mint_key: (args) => poolHandlers.pool_mint_key(args as Parameters<typeof poolHandlers.pool_mint_key>[0]),
-    pool_list_keys: () => poolHandlers.pool_list_keys(),
-    pool_topup_key: (args) => poolHandlers.pool_topup_key(args as Parameters<typeof poolHandlers.pool_topup_key>[0]),
-    pool_get_my_credentials: () => poolHandlers.pool_get_my_credentials(),
-    pool_get_my_stats: () => poolHandlers.pool_get_my_stats(),
-    pool_set_proxy_password: (args) => poolHandlers.pool_set_proxy_password(args as Parameters<typeof poolHandlers.pool_set_proxy_password>[0]),
-    pool_update_key: (args) => poolHandlers.pool_update_key(args as Parameters<typeof poolHandlers.pool_update_key>[0]),
-    pool_regenerate_key: (args) => poolHandlers.pool_regenerate_key(args as Parameters<typeof poolHandlers.pool_regenerate_key>[0]),
-    pool_reveal_key: (args) => poolHandlers.pool_reveal_key(args as Parameters<typeof poolHandlers.pool_reveal_key>[0]),
-    pool_delete_key: (args) => poolHandlers.pool_delete_key(args as Parameters<typeof poolHandlers.pool_delete_key>[0]),
-    pool_key_usage: (args) => poolHandlers.pool_key_usage(args as Parameters<typeof poolHandlers.pool_key_usage>[0]),
-    pool_key_audit: (args) => poolHandlers.pool_key_audit(args as Parameters<typeof poolHandlers.pool_key_audit>[0]),
-  };
-}
-
-/**
- * Get tool names list
- */
-export function getToolNames(): string[] {
-  return allToolDefinitions.map(t => t.name);
-}
-
-/**
- * Get tool definition by name
- */
-export function getToolDefinition(name: string) {
-  return allToolDefinitions.find(t => t.name === name);
+    ...createAccountToolHandlers(api),
+    ...createPortToolHandlers(api),
+    ...createStatusToolHandlers(api),
+    ...createRotationToolHandlers(api, baseUrl),
+    ...createBillingToolHandlers(api),
+    ...createReferenceToolHandlers(api),
+    ...createUtilityToolHandlers(api, baseUrl),
+    ...createPaymentToolHandlers(api),
+    ...createSupportToolHandlers(api),
+    ...createX402SessionToolHandlers(api),
+    ...createOpsToolHandlers(api),
+    ...createPoolToolHandlers(api),
+    ...createPrivatePoolToolHandlers(api),
+  } as unknown as ToolHandlers;
 }

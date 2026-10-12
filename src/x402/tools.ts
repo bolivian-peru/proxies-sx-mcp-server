@@ -1,9 +1,23 @@
 /**
  * x402 MCP Tool Definitions
- * Tool schemas for x402 protocol integration
+ * Tools of the optional wallet mode (AGENT_WALLET_KEY): pay per GB in USDC,
+ * no account. Prices are read from the API by the tools, not stated here.
  */
 
 import { z } from 'zod';
+import { readOnly, mutating, destructive, onChain } from '../tools/annotations.js';
+
+const POOL_TIERS = ['mbl', 'peer'] as const;
+
+const sessionId = {
+  type: 'string',
+  description: 'Session ID (optional: the most recent active session is used when omitted)',
+};
+const poolSessionToken = {
+  type: 'string',
+  description: 'Pool session token (x402s_...). Optional: the token cached by x402_get_pool_access is used when omitted.',
+};
+const noInput = { type: 'object' as const, properties: {}, required: [] as string[] };
 
 /**
  * x402 tool definitions for MCP
@@ -11,39 +25,37 @@ import { z } from 'zod';
 export const x402ToolDefinitions = [
   {
     name: 'x402_get_proxy',
+    annotations: onChain(mutating('x402: Buy Proxy')),
     description:
-      'Purchase a mobile proxy instantly using USDC on Base or Solana. No API key needed - payment is authentication. ' +
-      'Returns proxy credentials (HTTP/SOCKS5) immediately after on-chain payment confirmation. ' +
-      'Cost: $4.00/GB. Duration is FREE. Min purchase: 0.1 GB ($0.40).',
+      'Buy a dedicated mobile proxy on one carrier modem by paying USDC from the agent wallet; no account needed. ' +
+      'Sends an on-chain payment, then returns HTTP and SOCKS5 credentials. You pay per GB (see x402_get_pricing); time is free. ' +
+      'Only the countries from x402_list_countries work. Spends money.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         country: {
           type: 'string',
-          description:
-            'Country code (ISO 3166-1 alpha-2). Examples: US, DE, UK, FR, NL, PL, IT, ES, RU, UA, TR, IN, BR, MX, CA',
+          description: '2-letter ISO country code from x402_list_countries',
         },
         duration_hours: {
           type: 'number',
-          description: 'Duration in hours (1-720). Default: 1 hour',
+          minimum: 1,
+          maximum: 720,
+          description: 'Duration in hours (1-720, default: 1). Time is free.',
         },
         traffic_gb: {
           type: 'number',
-          description: 'Traffic allowance in GB (1-100). Default: 1 GB',
-        },
-        tier: {
-          type: 'string',
-          enum: ['shared', 'private'],
-          description:
-            'Proxy tier. $4.00/GB. Duration is FREE. Default: shared',
+          minimum: 0.1,
+          maximum: 100,
+          description: 'Traffic in GB (0.1-100, default: 1)',
         },
         city: {
           type: 'string',
-          description: 'City code for specific location (optional)',
+          description: 'Optional city name or code. There is no public list: leave it out unless you know the value.',
         },
         carrier: {
           type: 'string',
-          description: 'Mobile carrier code (optional)',
+          description: 'Optional carrier name or code. There is no public list: leave it out unless you know the value.',
         },
       },
       required: ['country'],
@@ -51,378 +63,240 @@ export const x402ToolDefinitions = [
   },
   {
     name: 'x402_get_pricing',
+    annotations: onChain(readOnly('x402: Get Pricing')),
     description:
-      'Calculate pricing for x402 proxy purchase before buying. Duration is FREE - you only pay for traffic ($4/GB).',
+      'Get the live x402 price per GB, the smallest purchase, the allowed duration and the payment networks, and compare the cost of a purchase with the wallet balance.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         traffic_gb: {
           type: 'number',
-          description: 'Traffic in GB. Default: 1',
-        },
-        tier: {
-          type: 'string',
-          enum: ['shared', 'private'],
-          description: 'Proxy tier. Default: shared',
+          minimum: 0.1,
+          maximum: 100,
+          description: 'Traffic in GB to price (default: 1)',
         },
       },
-      required: [],
+      required: [] as string[],
     },
   },
   {
     name: 'x402_list_sessions',
+    annotations: readOnly('x402: List Sessions'),
     description:
-      'List all active x402 proxy sessions for this wallet. Shows session IDs, locations, expiry times, and connection details.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {},
-      required: [],
-    },
+      'List the active x402 proxy sessions this wallet bought from this machine, with location, expiry and proxy host.',
+    inputSchema: noInput,
   },
   {
     name: 'x402_check_session',
+    annotations: readOnly('x402: Check Session'),
     description:
-      'Check status and traffic usage of an x402 session. Shows remaining time, traffic used/remaining, and connection details. ' +
-      'If no session_id provided, shows the most recent active session.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        session_id: {
-          type: 'string',
-          description: 'Session ID to check (optional, uses most recent if not provided)',
-        },
-      },
-      required: [],
-    },
+      'Get status, time left, traffic used and the connection strings of an x402 proxy session. Returns the proxy password.',
+    inputSchema: { type: 'object' as const, properties: { session_id: sessionId }, required: [] as string[] },
   },
   {
     name: 'x402_wallet_balance',
+    annotations: onChain(readOnly('x402: Wallet Balance')),
     description:
-      'Check USDC balance on Base network. Shows wallet address for topping up and current balance.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {},
-      required: [],
-    },
+      'Get the agent wallet address and its USDC and ETH (gas) balance on the Base network.',
+    inputSchema: noInput,
   },
   {
     name: 'x402_rotate_ip',
+    annotations: destructive('x402: Rotate Proxy'),
     description:
-      'Rotate the proxy to get a new IP address. Uses the rotation URL for the specified or most recent session.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        session_id: {
-          type: 'string',
-          description: 'Session ID to rotate (optional, uses most recent if not provided)',
-        },
-      },
-      required: [],
-    },
+      'Move an x402 proxy to another modem so it gets a different exit IP. The connection details stay the same. One rotation per 5 minutes.',
+    inputSchema: { type: 'object' as const, properties: { session_id: sessionId }, required: [] as string[] },
   },
   {
     name: 'x402_list_countries',
+    annotations: readOnly('x402: List Countries'),
     description:
-      'List all available countries for proxy purchase. Shows country codes, names, and availability status. ' +
-      'Use this to discover which locations are available before purchasing.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {},
-      required: [],
-    },
-  },
-  {
-    name: 'x402_list_cities',
-    description:
-      'List available cities in a specific country. Useful for targeting specific metropolitan areas.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        country: {
-          type: 'string',
-          description: 'Country code (ISO 3166-1 alpha-2). Example: US, DE, UK',
-        },
-      },
-      required: ['country'],
-    },
-  },
-  {
-    name: 'x402_list_carriers',
-    description:
-      'List available mobile carriers in a specific country. Useful for targeting specific networks.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        country: {
-          type: 'string',
-          description: 'Country code (ISO 3166-1 alpha-2). Example: US, DE, UK',
-        },
-      },
-      required: ['country'],
-    },
+      'List the countries where x402_get_proxy can create a proxy right now, with the number of free modems.',
+    inputSchema: noInput,
   },
   {
     name: 'x402_extend_session',
+    annotations: mutating('x402: Extend Session'),
     description:
-      'Extend an active session by adding hours to its expiry. Duration extensions are FREE (duration-only top-up ' +
-      'via /v1/x402/manage/session/topup) - no USDC is sent. All active ports in the session are extended. ' +
-      'Accepts either a cached session ID or the x402s_ session token from the purchase response as session_id. ' +
-      'To add more traffic (paid), use topup_x402_session instead.',
+      'Add hours to an x402 proxy session. Time is free: no payment is sent. ' +
+      'Takes a cached session ID or the x402s_ session token from the purchase response. To add traffic use topup_x402_session.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         session_id: {
           type: 'string',
-          description: 'Session ID or x402s_ session token to extend (optional, uses most recent if not provided)',
+          description: 'Session ID or x402s_ session token (optional: the most recent active session is used when omitted)',
         },
         additional_hours: {
           type: 'number',
-          description: 'Number of hours to add (1-168). Default: 1',
+          minimum: 1,
+          maximum: 168,
+          description: 'Hours to add (1-168, default: 1)',
         },
       },
-      required: [],
+      required: [] as string[],
     },
   },
   {
     name: 'x402_service_status',
+    annotations: onChain(readOnly('x402: Service Status')),
     description:
-      'Check x402 service health and availability. Returns service status and any maintenance notices.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {},
-      required: [],
-    },
+      'Check that the x402 payment service is up, and show the wallet balance and how many sessions are active or about to expire.',
+    inputSchema: noInput,
   },
-  // ============ x402 Pool Gateway Access (single credential, every country in your tier) ============
+  // ============ x402 Pool Gateway access (one credential, every country of the tier) ============
   {
     name: 'x402_get_pool_access',
+    annotations: onChain(mutating('x402: Buy Pool Access')),
     description:
-      'Buy Pool Gateway access with USDC on Base or Solana - no API key, payment is authentication. ' +
-      'Unlike x402_get_proxy (one dedicated modem), this returns ONE credential that reaches EVERY country in your tier ' +
-      'via the username DSL (e.g. psx_xxx-mbl-us, -mbl-pl, ...). v1 tier is "mbl" ($4/GB, metered, production ProxySmart modems). ' +
-      'HTTP proxy on port 7000 only. Pays on-chain then caches the returned session token. ' +
-      'Note: sticky pins the MODEM, not the IP - carrier NAT may still re-issue the egress IP.',
+      'Buy Pool Gateway traffic by paying USDC from the agent wallet; no account needed. ' +
+      'Returns one credential for gw.proxies.sx that reaches every country of the tier: pool and country go in the username (pool_build_proxy_url builds it). ' +
+      'Tier "peer" is the main network (residential and mobile, most countries); tier "mbl" is carrier modems in US, GB, FR, NL, PL and GE (Georgia). ' +
+      'Prices per tier: x402_pool_pricing. Stock per country: pool_get_stock. Spends money.',
     inputSchema: {
       type: 'object' as const,
       properties: {
+        tier: {
+          type: 'string',
+          enum: POOL_TIERS,
+          description: 'Pool tier. When omitted the API uses its default tier (see x402_pool_pricing).',
+        },
         country: {
           type: 'string',
-          description: 'Default country for the credential (ISO 3166-1 alpha-2, e.g. US, DE). One credential still reaches every country in your tier via the username DSL. Default: us',
+          description: '2-letter ISO country code used in the ready-made connection string (default: us)',
         },
         traffic_gb: {
           type: 'number',
-          description: 'GB to purchase (min 0.1). The GB cap IS your USDC envelope. Default: 1 GB',
-        },
-        tier: {
-          type: 'string',
-          enum: ['mbl'],
-          description: 'Pool tier. v1 = "mbl" only ($4/GB, metered, production modems). peer tiers are not yet enabled. Default: mbl',
+          minimum: 0.1,
+          maximum: 100,
+          description: 'GB to buy (0.1-100, default: 1)',
         },
         sid: {
           type: 'string',
-          description: 'Optional sticky session id (8-64 chars). Required for stickiness to persist across connections.',
+          description: 'Optional session id for the ready-made connection string (8-64 characters, lowercase letters, digits and _)',
         },
         rot: {
           type: 'string',
-          description: 'Optional rotation mode (auto5/auto10/auto20/auto60/ondemand/sticky/hard). Default: sticky',
+          description: 'Optional rotation mode for the ready-made connection string: auto5, auto10, auto20, auto60, ondemand, sticky or hard',
         },
       },
-      required: [],
+      required: [] as string[],
     },
   },
   {
     name: 'x402_pool_credit',
-    description:
-      'Check remaining pool-access credit (GB) for a pool session. Reads the real pak-backed balance. ' +
-      'Uses the cached session token if session_token is omitted.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        session_token: {
-          type: 'string',
-          description: 'Pool session token (x402s_...). Optional - uses the cached pool session if omitted.',
-        },
-      },
-      required: [],
-    },
+    annotations: readOnly('x402: Pool Credit'),
+    description: 'Get the GB bought, used and left on an x402 pool session.',
+    inputSchema: { type: 'object' as const, properties: { session_token: poolSessionToken }, required: [] as string[] },
   },
   {
     name: 'x402_pool_topup',
+    annotations: onChain(mutating('x402: Top Up Pool')),
     description:
-      'Top up a pool session with more GB (and/or duration) by paying USDC on-chain. ' +
-      'Traffic costs $4/GB (metered); duration-only top-ups are FREE. Pays automatically from your wallet. ' +
-      'Uses the cached session token if session_token is omitted.',
+      'Add GB and/or time to an x402 pool session. Adding GB sends a USDC payment from the agent wallet at the session\'s per-GB price; adding time only is free. Spends money when GB are added.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        session_token: {
-          type: 'string',
-          description: 'Pool session token (x402s_...). Optional - uses the cached pool session if omitted.',
-        },
+        session_token: poolSessionToken,
         add_traffic_gb: {
           type: 'number',
-          description: 'Additional GB to buy (min 0.1). Costs $4/GB. Omit for a free duration-only extension.',
+          minimum: 0.1,
+          maximum: 100,
+          description: 'GB to add (paid). Leave out to add time only.',
         },
         add_duration_seconds: {
           type: 'number',
-          description: 'Additional duration in seconds (min 3600). Duration is FREE.',
+          minimum: 3600,
+          description: 'Seconds to add (at least 3600). Free.',
         },
       },
-      required: [],
+      required: [] as string[],
     },
   },
   {
     name: 'x402_pool_regenerate',
+    annotations: destructive('x402: Regenerate Pool Password'),
     description:
-      'Rotate the pool credential secret (new pak password, SAME username). Use if the credential leaked. ' +
-      'Uses the cached session token if session_token is omitted.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        session_token: {
-          type: 'string',
-          description: 'Pool session token (x402s_...). Optional - uses the cached pool session if omitted.',
-        },
-      },
-      required: [],
-    },
+      'Replace the password of an x402 pool credential, for example after a leak. The username stays; the old password stops working at once. Returns a secret.',
+    inputSchema: { type: 'object' as const, properties: { session_token: poolSessionToken }, required: [] as string[] },
   },
   {
     name: 'x402_pool_connection',
+    annotations: readOnly('x402: Pool Connection'),
     description:
-      'Re-emit the full pool proxy credentials (host, port 7000, username, password, username template) for recovery. ' +
-      'Uses the cached session token if session_token is omitted.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {
-        session_token: {
-          type: 'string',
-          description: 'Pool session token (x402s_...). Optional - uses the cached pool session if omitted.',
-        },
-      },
-      required: [],
-    },
+      'Show the gateway host, port, username and password of an x402 pool session again. Returns a secret.',
+    inputSchema: { type: 'object' as const, properties: { session_token: poolSessionToken }, required: [] as string[] },
   },
   {
     name: 'x402_pool_usage',
-    description:
-      'Get per-day bandwidth usage (MB) for a pool session over the last N days (default 30, max 365), gap-filled with zeroes. ' +
-      'Uses the cached session token if session_token is omitted.',
+    annotations: readOnly('x402: Pool Usage'),
+    description: 'Get the traffic of an x402 pool session per day, in MB.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        session_token: {
-          type: 'string',
-          description: 'Pool session token (x402s_...). Optional - uses the cached pool session if omitted.',
-        },
+        session_token: poolSessionToken,
         days: {
           type: 'number',
-          description: 'Number of days of history to return (default 30, max 365).',
+          minimum: 1,
+          maximum: 365,
+          description: 'Days of history (default: 30)',
         },
       },
-      required: [],
+      required: [] as string[],
     },
   },
   {
     name: 'x402_pool_pricing',
+    annotations: readOnly('x402: Pool Pricing'),
     description:
-      'Get the Pool Gateway tier catalog (no auth, no wallet needed): tiers, $/GB, min purchase, supported networks, and the username DSL. ' +
-      'v1 tier = "mbl" ($4/GB, metered, production modems).',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {},
-      required: [],
-    },
-  },
-  {
-    name: 'get_pool_stock',
-    description:
-      'Get public Pool Gateway stock - online endpoint COUNTS per country (no IPs are ever returned). ' +
-      'No auth needed. Use this to see which countries currently have capacity before buying pool access.',
-    inputSchema: {
-      type: 'object' as const,
-      properties: {},
-      required: [],
-    },
+      'Get the Pool Gateway tiers that can be bought with x402 and their live price per GB and smallest purchase. No wallet funds needed.',
+    inputSchema: noInput,
   },
 ] as const;
+
+const poolSession = z.object({ session_token: z.string().optional() });
+const cachedSession = z.object({ session_id: z.string().optional() });
 
 /**
  * Zod validation schemas for x402 tools
  */
 export const x402Schemas = {
   x402_get_proxy: z.object({
-    country: z.string().min(2).max(3),
+    country: z.string().regex(/^[A-Za-z]{2}$/),
     duration_hours: z.number().min(1).max(720).optional(),
     traffic_gb: z.number().min(0.1).max(100).optional(),
-    tier: z.enum(['shared', 'private']).optional(),
     city: z.string().optional(),
     carrier: z.string().optional(),
   }),
   x402_get_pricing: z.object({
     traffic_gb: z.number().min(0.1).max(100).optional(),
-    tier: z.enum(['shared', 'private']).optional(),
   }),
   x402_list_sessions: z.object({}),
-  x402_check_session: z.object({
-    session_id: z.string().optional(),
-  }),
+  x402_check_session: cachedSession,
   x402_wallet_balance: z.object({}),
-  x402_rotate_ip: z.object({
-    session_id: z.string().optional(),
-  }),
+  x402_rotate_ip: cachedSession,
   x402_list_countries: z.object({}),
-  x402_list_cities: z.object({
-    country: z.string().min(2).max(3),
-  }),
-  x402_list_carriers: z.object({
-    country: z.string().min(2).max(3),
-  }),
-  x402_extend_session: z.object({
-    session_id: z.string().optional(),
+  x402_extend_session: cachedSession.extend({
     additional_hours: z.number().min(1).max(168).optional(),
   }),
   x402_service_status: z.object({}),
   // Pool Gateway Access
   x402_get_pool_access: z.object({
-    country: z.string().min(2).max(3).optional(),
+    tier: z.enum(POOL_TIERS).optional(),
+    country: z.string().regex(/^[A-Za-z]{2}$/).optional(),
     traffic_gb: z.number().min(0.1).max(100).optional(),
-    tier: z.enum(['mbl']).optional(),
     sid: z.string().optional(),
     rot: z.string().optional(),
   }),
-  x402_pool_credit: z.object({
-    session_token: z.string().optional(),
-  }),
-  x402_pool_topup: z.object({
-    session_token: z.string().optional(),
+  x402_pool_credit: poolSession,
+  x402_pool_topup: poolSession.extend({
     add_traffic_gb: z.number().min(0.1).max(100).optional(),
     add_duration_seconds: z.number().min(3600).optional(),
   }),
-  x402_pool_regenerate: z.object({
-    session_token: z.string().optional(),
-  }),
-  x402_pool_connection: z.object({
-    session_token: z.string().optional(),
-  }),
-  x402_pool_usage: z.object({
-    session_token: z.string().optional(),
+  x402_pool_regenerate: poolSession,
+  x402_pool_connection: poolSession,
+  x402_pool_usage: poolSession.extend({
     days: z.number().min(1).max(365).optional(),
   }),
   x402_pool_pricing: z.object({}),
-  get_pool_stock: z.object({}),
 };
-
-/**
- * Get all x402 tool names
- */
-export function getX402ToolNames(): string[] {
-  return x402ToolDefinitions.map((t) => t.name);
-}
-
-/**
- * Check if a tool name is an x402 tool
- */
-export function isX402Tool(toolName: string): boolean {
-  return toolName.startsWith('x402_') || toolName === 'get_pool_stock';
-}

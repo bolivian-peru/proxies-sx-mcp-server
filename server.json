@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.bolivian-peru/proxies-sx-mcp-server",
+  "description": "Residential and mobile proxies for AI agents: Pool Gateway proxy URLs, live stock per country, Private Pools and Reserved IPs, dedicated ports, usage, billing and support.",
+  "version": "3.0.0",
+  "websiteUrl": "https://agents.proxies.sx/",
+  "repository": {
+    "url": "https://github.com/bolivian-peru/proxies-sx-mcp-server",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@proxies-sx/mcp-server",
+      "version": "3.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "PROXIES_API_KEY",
+          "description": "psx_ API key created at client.proxies.sx/account (standard mode). Optional when using x402 wallet mode.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "AGENT_WALLET_KEY",
+          "description": "Private key (0x...) of a USDC wallet on the Base network, for the optional x402 wallet mode (no account needed).",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "PROXIES_API_URL",
+          "description": "API base URL. A trailing /v1 is accepted. Leave unset unless you run a private API.",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "https://api.proxies.sx"
+        }
+      ]
+    }
+  ]
+}

@@ -1,84 +1,69 @@
 # CrewAI + Proxies.sx MCP
 
-Use mobile proxies in CrewAI agents for web scraping and data collection.
+Give a CrewAI agent residential and mobile proxies through the Proxies.sx MCP server.
 
 ## Setup
 
 ```bash
-pip install crewai crewai-tools
-npm install -g @proxies-sx/mcp-server
+pip install crewai "crewai-tools[mcp]"
 ```
 
-## Configure MCP Server
+Node.js 18 or newer must be installed: the server is started with `npx`.
 
-Add to your CrewAI project's MCP config:
-
-```yaml
-# mcp_servers.yaml
-proxies-sx:
-  command: npx
-  args: ["-y", "@proxies-sx/mcp-server"]
-  env:
-    PROXIES_API_KEY: "psx_your_key_here"
-    PROXIES_API_URL: "https://api.proxies.sx/v1"
-```
-
-## Crew with Proxy Agent
+## Crew with a proxy-aware agent
 
 ```python
+import os
 from crewai import Agent, Task, Crew
-from crewai_tools import MCPTool
+from crewai_tools import MCPServerAdapter
+from mcp import StdioServerParameters
 
-# Initialize MCP tools
-proxy_tools = MCPTool(
-    server_name="proxies-sx",
+server = StdioServerParameters(
     command="npx",
     args=["-y", "@proxies-sx/mcp-server"],
-    env={
-        "PROXIES_API_KEY": "psx_your_key_here",
-        "PROXIES_API_URL": "https://api.proxies.sx/v1",
-    },
+    # PROXIES_API_URL is not needed
+    env={"PROXIES_API_KEY": os.environ["PROXIES_API_KEY"], **os.environ},
 )
 
-# Create scraping agent
-scraper = Agent(
-    role="Web Scraper",
-    goal="Scrape websites using mobile proxies to avoid blocks",
-    backstory="Expert at bypassing anti-bot systems using mobile IP rotation",
-    tools=[proxy_tools],
-)
+with MCPServerAdapter(server) as proxy_tools:
+    scraper = Agent(
+        role="Web Scraper",
+        goal="Fetch pages through a proxy in the right country",
+        backstory="Knows how to pick a proxy pool and keep a session on one device",
+        tools=proxy_tools,
+    )
 
-# Create scraping task
-scrape_task = Task(
-    description="""
-    1. Use create_port to get a US mobile proxy (country: US, tier: shared)
-    2. Use get_proxy_connection_string to get the HTTP proxy URL
-    3. Scrape the target website using the proxy
-    4. If blocked, use rotate_port to get a new IP
-    5. Delete the port when done
-    """,
-    expected_output="Scraped data from the target website",
-    agent=scraper,
-)
+    scrape_task = Task(
+        description="""
+        1. Call pool_get_stock with the target country to see which pool has stock there.
+        2. Call pool_get_my_credentials for proxyUsername and proxyPassword.
+        3. Call pool_build_proxy_url with pool "peer", the country, rotation "sticky" and a sid,
+           and use the returned proxyUrl for the HTTP requests.
+        4. If the proxy refuses a request, pass the error text to pool_explain_error and do what it says.
+        """,
+        expected_output="The fetched data",
+        agent=scraper,
+    )
 
-crew = Crew(agents=[scraper], tasks=[scrape_task])
-result = crew.kickoff()
+    result = Crew(agents=[scraper], tasks=[scrape_task]).kickoff()
 ```
 
-## Key Tools for CrewAI
+The adapter API belongs to `crewai-tools`; check its documentation if your version differs.
 
-| Tool | Use When |
+## Tools an agent needs most
+
+| Tool | Use when |
 |------|----------|
-| `create_port` | Start a scraping session |
-| `get_proxy_connection_string` | Get proxy URL for HTTP client |
-| `rotate_port` | Rotate IP when blocked |
-| `get_port_ip` | Verify current IP |
-| `delete_port` | Clean up when done |
-| `list_available_countries` | Check country availability |
+| `pool_get_stock` | Choosing a pool and country |
+| `pool_get_facets` | Targeting a city, state or carrier |
+| `pool_get_my_credentials` | Getting the proxy username and password |
+| `pool_build_proxy_url` | Building the proxy URL |
+| `pool_explain_error` | A request through the proxy failed |
+| `get_account_usage` | Checking how much traffic is left |
+| `create_support_ticket` | A person has to look at it |
 
 ## Tips
 
-- Use `shared` tier for cost-effective scraping ($4/GB)
-- Rotate IP between requests to avoid fingerprinting
-- Check `get_port_status` before scraping to ensure proxy is online
-- Use `configure_auto_rotation` for hands-free IP rotation
+- `mbl` (carrier modems) exists only in US, GB, FR, NL, PL and GE (Georgia). Use `peer` everywhere else.
+- A session persists across connections only with a `sid`. Sticky holds the device, not the IP.
+- You pay per GB and time is free: `get_pricing` reads the live price.

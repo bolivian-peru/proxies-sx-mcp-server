@@ -1,5 +1,67 @@
 # Changelog
 
+## 3.0.0 (2026-10-08)
+
+The server is brought in line with the live API. The tools a customer key can use were exercised against production for this release; reseller-only, admin-only and paid paths were checked up to the API's refusal and are pinned by route tests. Before this release, 27 of the tools failed or printed wrong output with the default configuration. This release also carries the changes of 2.4.2, which was never published to npm.
+
+### Breaking for callers that name these
+- `get_pool_stock` (wallet mode) is now `pool_get_stock`; `x402_list_cities` and `x402_list_carriers` are gone (see Removed). A client that discovers tools with `tools/list` is not affected; a prompt or script that calls one of these three by name gets "Unknown tool".
+- `pool_build_proxy_url` without `pool` now builds `any` (the gateway chooses), not `mbl`.
+- `PREFERRED_NETWORK` is ignored. Arguments that were removed (`tier`, `type`, `isPrivate`, the `list_ports` filters) are ignored when sent, not refused.
+
+### Added
+- **Pool Gateway:** `pool_get_facets` (cities, states, carriers and IP classes with stock in a country), `pool_explain_error` (what a gateway error code means and what to do), `pool_close_all_sessions`. `pool_get_stock` takes an optional `country` and shows the per-class counts. Stock, facets, the URL builder, the error explainer and `get_service_status` need no account and are also listed in wallet mode.
+- **ISP (static) class:** `pool_build_proxy_url` accepts `ipType: "isp"` (`datacenter` is accepted as another name) and emits `-iptype-isp`. The class is served only when named. The builder also takes `state`, `isp`, `asn`, `strict`, `failover` and `ttl`.
+- **Private Pool and Reserved IPs:** `private_pool_list`, `private_pool_build`, `private_pool_reveal`, `private_pool_usage`, `reserved_ip_list`, `reserved_ip_reserve`, `reserved_ip_rotate`, `reserved_ip_extend`, `reserved_ip_set_rotation`, `reserved_ip_release`.
+- **Billing:** `coupon_validate`, `coupon_redeem`, `get_payment_history`; `purchase_shared_traffic` takes an optional `couponCode`.
+- **Dedicated ports:** `extend_port`. `list_available_countries` takes a `countryId` and then lists the carriers and cities there with their ids.
+- `get_service_status`: open incidents, component state and uptime.
+- **Actionable errors.** A failing tool now always returns `isError: true`. For a missing or revoked key (401), a missing scope (403), an unknown route, a rate limit (429) and server errors the text ends with a `What to do:` line, and keys and passwords are masked in it.
+- `tools.json`: the tool catalogue in machine-readable form, generated with `manifest.json` by `npm run build:manifest` and shipped in the package. The same script writes the tool lists inside `README.md`, `SKILL.md` and `llm.txt`.
+- MCP annotations on the wallet (x402) tools; the tools that read or pay on-chain carry `openWorldHint: true`. (From 2.4.2: annotations on every API-key tool, `manifest.json`, `Dockerfile`, registry section in the README.)
+- Tests: every tool has a handler, a zod schema, annotations and a valid JSON Schema; the method, path, body and headers of every API tool; the username builder against a copy of the live gateway parser; the error mapping. `tests/live-smoke.mjs` calls every read-only tool against production.
+
+### Changed
+- `PROXIES_API_URL` is accepted with or without a trailing `/v1`. The documented value `https://api.proxies.sx/v1` used to make every API-key tool call `/v1/v1/...`.
+- `pool_build_proxy_url`: the secret argument is `password` (`pakKey` still works); the pool defaults to `any`; values are reduced to what the gateway keeps (a `-` in a `sid` used to cut the token); it refuses the `mbl` pool outside US, GB, FR, NL, PL and GE (Georgia) and warns when `sticky`, `hard` or `auto*` has no `sid`; SOCKS5 URLs use `socks5h://`.
+- `pool_get_my_credentials` returns the real proxy password, not a placeholder.
+- `get_account_usage` shows Pool Gateway and dedicated-port traffic separately and no longer prints a price; `get_pricing` is the place for prices.
+- `rotate_port` and `reconfigure_port` print the port's new connection strings; `reconfigure_port` says that the port ID changes.
+- `get_port_ip` returns the server address and says that the API does not return the exit IP.
+- The dedicated-port tools refuse a `portId` that is not a 24-character ID before calling the API and point to `list_ports`; a port name used to end in a server error.
+- The Private Pool and Reserved IP tools say that connection strings come back with `pak_********` as the password and that `private_pool_reveal` gives the key to put in its place.
+- Ticket categories and priorities are the ones the API accepts (`general`, `feature_request`, `port_issue`, `port_addition_request`; priority `urgent`).
+- `x402_get_pool_access` offers the `peer` and `mbl` tiers; `x402_get_pricing` and `x402_pool_pricing` read live prices. Wallet tools no longer carry prices in their descriptions.
+- Tool descriptions no longer state prices or country counts.
+- `create_crypto_payment`, `cancel_crypto_payment` and `purchase_shared_traffic` say that they need a reseller or admin key (`billing:write`); a customer key cannot hold that scope.
+
+### Removed
+- `x402_list_cities` and `x402_list_carriers`: the routes they called do not exist and the API has no public list of those values.
+- `get_pool_stock` (wallet mode): `pool_get_stock` is listed in every mode instead.
+- The `tier` argument of `x402_get_proxy` and `x402_get_pricing`, and the `type`/`isPrivate` arguments of `create_port`, `list_ports` and `list_available_countries`: private ports are retired and the API accepts the shared tier only.
+- `list_ports` filters the API ignored (`type`, `countryId`, `carrierId`). `status` and `limit` remain.
+- `PREFERRED_NETWORK`: the agent wallet pays on Base only, so the setting never worked for Solana.
+- Unused API methods and types that pointed at routes which no longer exist, and the hand-run scripts in `tests/`.
+- Farmer payout rates from the README.
+
+### Fixed
+- Support tickets: all five tools called `/tickets` without `/v1` (404).
+- x402 session tools: all eight called `/x402/...` without `/v1` (404); `replace_x402_port` and `topup_x402_session` sent the session token and payment signature in the URL instead of headers.
+- `reconfigure_port` (now `POST`), `configure_auto_rotation` (now `PATCH`), `speed_test_port` (now `/test-speed`): wrong method or path (404).
+- The public rotation link of a port lacked `/v1`.
+- `get_port_status` always said OFFLINE; `get_rotation_history` was always empty; `rotate_port` printed "undefined"; `get_account_summary` printed "[object Object]" and "null days remaining"; `purchase_shared_traffic` printed a total of $0.00; `list_ports` showed no country or carrier.
+- `x402_list_countries` called a route that does not exist.
+- x402 purchases (`x402_get_proxy`, `x402_get_pool_access`, `x402_pool_topup`): the 402 answer was read from the wrong place and the payment proof was sent in a header the API does not read; requests went to a path without `/v1`. Verified up to the payment step with an unfunded wallet; a paid purchase was not run for this release.
+- `list_available_countries` asks for dedicated-port countries only (first published in this release; 2.4.1 printed every country with "0 devices").
+- `server.json` and the docs pointed at `client.proxies.sx/api-keys`; keys are created at `client.proxies.sx/account`.
+
+### Security
+- The x402 session cache in `~/.proxies-sx/` holds proxy passwords and `x402s_` session tokens. Its files are now written readable by the owner only (mode 600); they used to get the default mode.
+- A tool error masks the exact API key, login password and wallet key the server was started with, whatever their shape.
+- An id argument that contains `?`, `#`, a backslash or a `.`/`..` path segment is refused before any request, so it cannot steer a call to another API route.
+- When a request fails after an on-chain USDC payment was sent (`x402_get_proxy`, `x402_get_pool_access`, `x402_pool_topup`), the error names the transaction hash. Before, the hash was lost with the failure.
+- `reconfigure_port` is annotated destructive: it removes the old port ID, login and port numbers.
+
 ## 2.4.1 (2026-07-25)
 
 Doc/example correctness pass on top of 2.4.0 — no tool surface changes, no version-number-worthy behavior changes to already-shipped code. Tool count unchanged at 89 (70 api-key + 19 x402).

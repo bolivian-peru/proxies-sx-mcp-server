@@ -1,111 +1,93 @@
 /**
  * Proxies.sx API Type Definitions
- * Complete TypeScript interfaces for all API responses
+ * Response shapes of the routes the tools call, as production returns them.
  */
-
-// ============================================================================
-// Common Types
-// ============================================================================
-
-export interface ApiError {
-  statusCode: number;
-  message: string;
-  error?: string;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
 
 // ============================================================================
 // Reference Data Types
 // ============================================================================
 
-export interface Country {
+export interface NamedRef {
   _id: string;
   name: string;
-  code: string;
-  flag?: string;
-  isActive: boolean;
 }
 
-// NOTE: City, Carrier, Region types removed - 2026-01-03
-// These reference data endpoints were deprecated as the data was stale.
-// Real device availability is fetched dynamically at port creation time.
+export interface Country extends NamedRef {
+  code: string;
+}
+
+/** A country, carrier or city that has free dedicated-port devices right now. */
+export type WithFreeDevices<T> = T & { freeDeviceCount: number };
 
 // ============================================================================
 // Account Types
 // ============================================================================
 
-export interface SlotResource {
+export interface ResourceUsage {
   total: number;
   used: number;
   available: number;
 }
 
-export interface TrafficResource {
-  total: number;
-  used: number;
-  available: number;
-}
-
-export interface ResourceCategory {
-  slots: SlotResource;
-  trafficGB: TrafficResource;
-  expiresAt?: number;
-  daysRemaining?: number;
+export interface AccountAlert {
+  type: string;
+  message: string;
+  severity: string;
 }
 
 export interface AccountSummary {
   balance: number;
   currency: string;
-  shared?: ResourceCategory;
-  private?: ResourceCategory;
-  alerts: string[];
+  shared?: {
+    slots: ResourceUsage;
+    trafficGB: ResourceUsage;
+    expiresAt?: number | null;
+    daysRemaining?: number | null;
+  };
+  alerts: AccountAlert[];
 }
 
 export interface TrafficBalanceBreakdown {
-  totalPayments: number;
-  totalPurchases: number;
-  trafficUsedMB: number;
   trafficUsedGB: number;
   purchasedTrafficGB: number;
   availableTrafficGB: number;
-  pricePerGB: number;
   balance: number;
   currency: string;
-  formula?: string;
+}
+
+export interface TrafficUsage {
+  total: { inMB: number; outMB: number; totalMB: number; totalGB: number };
+  /** `portId` is `gw_pool` for Pool Gateway traffic, a port id otherwise. */
+  byPort: Array<{ portId: string; inMB: number; outMB: number; totalMB: number; totalGB: number }>;
 }
 
 // ============================================================================
 // Port Types
 // ============================================================================
 
-export type PortType = 'shared' | 'private';
-export type PortStatus = 'active' | 'suspended' | 'expired' | 'pending';
-export type SyncStatus = 'synced' | 'pending_create' | 'pending_delete' | 'pending_apply' | 'orphaned_local' | 'orphaned_remote' | 'conflict';
-
 export interface RotationSettings {
   enabled: boolean;
-  intervalSeconds: number; // Interval in seconds (min 60 for private, min 300 for shared)
+  intervalSeconds: number; // minimum 300 on the shared ports the API sells
   matchCarrier: boolean;
   matchCity: boolean;
   lastRotatedAt: Date | string | null;
   rotationCount: number;
-  excludedDeviceIds: string[];
+}
+
+export interface PortDevice {
+  country?: { name: string; code?: string };
+  carrier?: { name: string };
+  city?: { name: string };
 }
 
 export interface Port {
   _id: string;
-  name: string; // ProxySmart portID - changes on rotation
-  displayName?: string; // User-friendly name that never changes
-  originalPortName?: string; // Original port name at creation
-  customerId: string;
-  deviceId: string | { _id: string; imei: string; [key: string]: unknown }; // May be populated
+  name: string; // modem-side port id, changes on rotation
+  displayName?: string; // user-facing name that never changes
+  /** The device behind the port with its location: GET /v1/ports/:id populates it here ... */
+  deviceId?: string | PortDevice;
+  /** ... and GET /v1/ports under this name. */
+  device?: PortDevice;
 
   // Connection details
   httpPort: number;
@@ -114,286 +96,154 @@ export interface Port {
   proxyLogin: string;
   proxyPassword: string;
 
-  // Location info (from populated device)
-  countryId?: string;
-  countryName?: string;
-  cityId?: string;
-  cityName?: string;
-  carrierId?: string;
-  carrierName?: string;
-  regionId?: string;
-  regionName?: string;
-
   // Status
-  slotType: 'shared' | 'private'; // Type of port (determines traffic pool)
   status: string; // 'active', 'expiring_soon', 'expired', 'grace_period', 'deleted'
   suspended: boolean;
-  syncStatus?: SyncStatus;
-  healthStatus?: string;
 
-  // OS Fingerprint
   osFingerprint?: string | null;
 
   // Rotation
   rotationToken?: string;
-  rotationTokenExpiresAt?: string;
   rotationSettings?: RotationSettings;
 
-  // Traffic
-  lastTrafficIn: number;
-  lastTrafficOut: number;
-  baseTrafficIn: number;
-  baseTrafficOut: number;
-  lastTrafficCollectedAt?: string;
-
-  // Timestamps
   expiresAt: number; // Unix timestamp in milliseconds
-  createdAt?: number;
-  updatedAt?: number;
-
-  // Virtual populated fields
-  device?: {
-    _id: string;
-    imei: string;
-    countryId?: { name: string; code: string };
-    carrierId?: { name: string };
-    regionId?: { name: string };
-    cityId?: { name: string };
-  };
 }
 
 export interface PortStatusInfo {
-  portId: string;
-  isOnline: boolean;
+  status: string; // 'online' | 'offline' | 'expired'
+  isActive: boolean;
   lastChecked: string;
-  uptime?: number;
-  deviceStatus?: string;
+  expiresAt: number;
 }
 
 export interface PortIp {
-  portId?: string;
+  /** Always 'hidden' for customers: the API never returns an exit IP. */
   publicIp: string;
   serverIp: string;
-  ip?: string; // Alias for publicIp
-  country?: string;
-  city?: string;
-  isp?: string;
-  checkedAt?: string;
 }
 
 export interface PingResult {
-  portId?: string;
   success: boolean;
-  ip?: string;
   responseTime?: number;
-  latencyMs?: number; // Alias
   testTime?: string | Date;
   error?: string;
-  checkedAt?: string;
 }
 
 export interface SpeedTestResult {
-  portId: string;
-  downloadMbps: number;
-  uploadMbps: number;
-  latencyMs: number;
-  testedAt: string;
+  downloadSpeed: number;
+  uploadSpeed: number;
+  ping: number;
+  testTime: string;
+}
+
+export interface ExtendPortResult {
+  success: boolean;
+  message: string;
+  newExpiresAt: number;
+}
+
+export interface MaxExtendHours {
+  maxHoursAllowed: number;
+  currentExpiresAt: number;
+  maxExpiresAt: number;
 }
 
 // ============================================================================
 // Rotation Types
 // ============================================================================
 
-export type RotationTriggerType = 'manual' | 'automatic' | 'api_token';
+export interface RotateResult {
+  success: boolean;
+  portId: string;
+  rotationDurationMs?: number;
+  rotationCount?: number;
+  message?: string;
+}
 
 export interface RotationHistoryEntry {
-  _id: string;
-  portId: string;
-  previousDeviceId: string;
-  newDeviceId: string;
-  previousDeviceName?: string;
-  newDeviceName?: string;
-  trigger: RotationTriggerType;
+  triggerType: string; // 'manual' | 'automatic' | 'api_token'
   success: boolean;
   errorMessage?: string;
-  rotatedAt: string;
+  rotationDurationMs?: number;
+  country?: string;
+  carrier?: string;
+  city?: string;
+  createdAt: string;
+}
+
+export interface RotationHistory {
+  rotations: RotationHistoryEntry[];
+  total: number;
 }
 
 export interface CanRotateResponse {
   canRotate: boolean;
   reason?: string;
-  cooldownEndsAt?: string;
-  nextAvailableRotation?: string;
+  nextRotationAt?: string;
+  cooldownRemaining?: number; // seconds
+  availableDevices?: number;
 }
-
-// ============================================================================
-// OS Fingerprint Types
-// ============================================================================
-
-export interface OsFingerprintOption {
-  value: string;
-  label: string;
-  description?: string;
-}
-
-export const OS_FINGERPRINTS: OsFingerprintOption[] = [
-  { value: '', label: 'None', description: 'No OS fingerprint spoofing' },
-  { value: 'windows:1', label: 'Windows 10', description: 'Windows 10 fingerprint' },
-  { value: 'macosx:3', label: 'macOS', description: 'macOS fingerprint' },
-  { value: 'macosx:4', label: 'macOS (iPhone)', description: 'macOS iPhone fingerprint' },
-  { value: 'ios:2', label: 'iOS (Real)', description: 'Real iOS fingerprint' },
-  { value: 'ios:1', label: 'iOS (p0f)', description: 'iOS p0f fingerprint' },
-  { value: 'android:3', label: 'Android (Real)', description: 'Real Android fingerprint' },
-  { value: 'android:1', label: 'Android (p0f)', description: 'Android p0f fingerprint' },
-];
 
 // ============================================================================
 // Billing Types
 // ============================================================================
 
-export type PurchaseType = 'slots' | 'traffic';
-export type PurchaseCategory = 'shared' | 'private';
-export type PaymentMethod = 'balance' | 'card' | 'crypto';
-export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
-
-// ============================================================================
-// Pricing Types (New Business Model - Jan 2026)
-// ============================================================================
-
-/**
- * Volume discount tier
- */
 export interface VolumeDiscount {
   minGB: number;
   maxGB: number | null;
   discountPercent: number;
 }
 
-/**
- * Slot tier unlocked by cumulative GB purchases
- */
+/** Port slots are free and unlock with cumulative GB purchased. */
 export interface SlotTier {
   name: string;
   minGB: number;
   sharedSlots: number;
-  privateSlots: number;
 }
 
-/**
- * User's current tier information
- */
 export interface UserTierInfo {
   currentTier: SlotTier;
   nextTier: SlotTier | null;
   cumulativeGB: number;
   gbToNextTier: number;
   sharedSlotLimit: number;
-  privateSlotLimit: number;
 }
 
-/**
- * Complete pricing information from /v1/billing/pricing
- */
+/** GET /v1/billing/pricing */
 export interface PricingInfo {
-  basePrices: {
-    shared: number;
-    private: number;
-  };
+  basePrices: { shared: number };
   volumeDiscounts: VolumeDiscount[];
   slotTiers: SlotTier[];
   userTierInfo: UserTierInfo | null;
 }
 
-/**
- * Price calculation result from /v1/billing/calculate-price
- */
+/** GET /v1/billing/calculate-price */
 export interface PriceCalculation {
   basePrice: number;
   discountPercent: number;
   pricePerGB: number;
   totalPrice: number;
   amount: number;
-  isPrivate: boolean;
 }
 
-/**
- * Raw tariff from backend (before enhancement)
- */
-export interface RawTariff {
-  _id: string;
-  type: string; // TariffType enum: 'Ports', 'Traffic', 'PortsShared', 'PortsPrivate', 'TrafficShared', 'TrafficPrivate'
-  price: number;
-  portRange?: { min: number; max: number } | null;
-  trafficRange?: { min: number; max: number } | null;
-  createdAt?: number;
-  updatedAt?: number;
-}
-
-/**
- * Enhanced tariff returned by the API (includes computed fields)
- */
-export interface Tariff extends RawTariff {
-  // Computed fields from backend
-  category: 'shared' | 'private' | 'legacy';
-  resourceType: 'ports' | 'traffic';
-  pricePerUnit: number;
-  unitType: 'slot' | 'gb';
-  billingPeriod: 'monthly' | 'one-time';
-  displayName: string;
-  description: string;
-}
-
+/** POST /v1/billing/purchase-traffic returns the purchase document. */
 export interface Purchase {
   _id: string;
-  userId: string;
-  type: PurchaseType;
-  category: PurchaseCategory;
-  quantity: number;
-  pricePerUnit: number;
-  totalPrice: number;
-  paymentMethod: PaymentMethod;
-  paymentStatus: PaymentStatus;
-  stripePaymentIntentId?: string;
-  createdAt: string;
-  completedAt?: string;
-}
-
-export interface PurchaseRequest {
-  type: PurchaseType;
-  category: PurchaseCategory;
-  quantity: number;
-  paymentMethod: PaymentMethod;
-}
-
-export interface PurchaseResponse {
-  purchase: Purchase;
-  requiresAction?: boolean;
-  clientSecret?: string;
-  message?: string;
+  amount: number; // GB
+  price: number; // USD charged to the balance
 }
 
 // ============================================================================
-// Create Port Types
+// Request Types
 // ============================================================================
 
 export interface CreatePortRequest {
   countryId: string;
   carrierId?: string;
   cityId?: string;
-  regionId?: string;
   expiresAt: number; // seconds from now (60-31536000)
-  isPrivate?: boolean; // true for private/dedicated device
   osFingerprint?: string;
 }
-
-export interface CreatePortResponse {
-  port: Port;
-  message: string;
-}
-
-// ============================================================================
-// Update Port Types
-// ============================================================================
 
 export interface UpdateCredentialsRequest {
   proxyLogin?: string;
@@ -402,88 +252,13 @@ export interface UpdateCredentialsRequest {
 
 export interface UpdateRotationSettingsRequest {
   enabled?: boolean;
-  intervalSeconds?: number; // Interval in seconds (min 60 for private, min 300 for shared, max 86400)
+  intervalSeconds?: number; // 300-86400
   matchCarrier?: boolean;
   matchCity?: boolean;
-  excludedDeviceIds?: string[];
 }
 
 export interface ReconfigurePortRequest {
   countryId: string;
   carrierId?: string;
   cityId?: string;
-  regionId?: string;
-}
-
-// ============================================================================
-// Notification Types
-// ============================================================================
-
-export type NotificationType = 'info' | 'warning' | 'success' | 'error';
-export type NotificationCategory = 'port' | 'billing' | 'account' | 'system';
-
-export interface Notification {
-  _id: string;
-  userId: string;
-  type: NotificationType;
-  category: NotificationCategory;
-  title: string;
-  message: string;
-  isRead: boolean;
-  entityId?: string;
-  entityType?: 'Port' | 'Purchase' | 'Payment' | 'User';
-  metadata?: Record<string, unknown>;
-  actionLink?: string;
-  actionLabel?: string;
-  expiresAt?: string;
-  createdAt: string;
-}
-
-// ============================================================================
-// API Key Types
-// ============================================================================
-
-export type ApiKeyScope =
-  | 'ports:read'
-  | 'ports:write'
-  | 'ports:rotate'
-  | 'billing:read'
-  | 'billing:write'
-  | 'account:read'
-  | 'account:write'
-  | 'traffic:read'
-  | 'tickets:read'
-  | 'tickets:write'
-  | 'admin:full';
-
-export interface ApiKey {
-  _id: string;
-  name: string;
-  keyPrefix: string;
-  scopes: ApiKeyScope[];
-  lastUsedAt?: string;
-  expiresAt?: string;
-  isActive: boolean;
-  createdAt: string;
-}
-
-// ============================================================================
-// Traffic Types
-// ============================================================================
-
-export interface TrafficRecord {
-  portId: string;
-  bytesIn: number;
-  bytesOut: number;
-  timestamp: string;
-}
-
-export interface TrafficSummary {
-  totalBytesIn: number;
-  totalBytesOut: number;
-  totalGB: number;
-  period: {
-    from: string;
-    to: string;
-  };
 }

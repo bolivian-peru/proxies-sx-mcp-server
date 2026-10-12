@@ -4,8 +4,11 @@
  */
 
 import { z } from 'zod';
+import { portIdSchema } from './ports.js';
 import type { ProxiesApi } from '../api/index.js';
-import { formatRotationEntry, formatPortSummary } from '../utils/formatting.js';
+import { formatRotationEntry, formatPortSummary, formatPortConnection } from '../utils/formatting.js';
+import type { CanRotateResponse } from '../api/index.js';
+import { readOnly, mutating, destructive } from './annotations.js';
 
 /**
  * Tool definitions for rotation management
@@ -13,7 +16,8 @@ import { formatRotationEntry, formatPortSummary } from '../utils/formatting.js';
 export const rotationToolDefinitions = [
   {
     name: 'rotate_port',
-    description: 'Rotate a port to a new modem/device. This changes the IP address while keeping port credentials and settings.',
+    annotations: destructive('Rotate Port'),
+    description: 'Move a dedicated port to another modem in the same location. The login and password stay, but the HTTP and SOCKS5 port numbers change, so read the returned connection strings. One rotation per 5 minutes. Scope ports:rotate.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -27,7 +31,8 @@ export const rotationToolDefinitions = [
   },
   {
     name: 'check_rotation_availability',
-    description: 'Check if a port can be rotated right now (cooldown, circuit breaker status)',
+    annotations: readOnly('Check Rotation Availability'),
+    description: 'Check whether a dedicated port can be rotated now, how long the cooldown still runs and how many other modems are free. Scope ports:read.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -41,7 +46,8 @@ export const rotationToolDefinitions = [
   },
   {
     name: 'configure_auto_rotation',
-    description: 'Configure automatic rotation settings for a port',
+    annotations: mutating('Configure Auto Rotation', true),
+    description: 'Turn automatic rotation of a dedicated port on or off and set its interval. Scope ports:write.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -55,6 +61,8 @@ export const rotationToolDefinitions = [
         },
         intervalMinutes: {
           type: 'number',
+          minimum: 5,
+          maximum: 1440,
           description: 'Rotation interval in minutes (5-1440)',
         },
         matchCarrier: {
@@ -71,7 +79,8 @@ export const rotationToolDefinitions = [
   },
   {
     name: 'get_rotation_history',
-    description: 'Get the rotation history for a port',
+    annotations: readOnly('Get Rotation History'),
+    description: 'Get the past rotations of a dedicated port: when, how triggered, the location it moved to and whether it worked. Scope ports:read.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -81,6 +90,8 @@ export const rotationToolDefinitions = [
         },
         limit: {
           type: 'number',
+          minimum: 1,
+          maximum: 100,
           description: 'Maximum number of entries to return (default: 10)',
         },
       },
@@ -89,7 +100,8 @@ export const rotationToolDefinitions = [
   },
   {
     name: 'get_rotation_token_url',
-    description: 'Get the public rotation URL for a port (can be used without authentication)',
+    annotations: readOnly('Get Rotation Token URL'),
+    description: 'Get the public rotation link of a dedicated port. Anyone holding the link can rotate the port with a plain GET, no API key. Scope ports:read.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -103,6 +115,14 @@ export const rotationToolDefinitions = [
   },
 ] as const;
 
+function describeCooldown(result: CanRotateResponse): string[] {
+  const lines = [`Cannot rotate: ${result.reason || 'not available right now'}`];
+  if (result.cooldownRemaining) lines.push(`Cooldown remaining: ${result.cooldownRemaining} seconds`);
+  if (result.nextRotationAt) lines.push(`Next rotation possible at: ${result.nextRotationAt}`);
+  if (result.availableDevices != null) lines.push(`Other devices free: ${result.availableDevices}`);
+  return lines;
+}
+
 /**
  * Rotation tools handler
  */
@@ -113,11 +133,21 @@ export function createRotationToolHandlers(api: ProxiesApi, baseUrl: string) {
         // First check if rotation is available
         const canRotate = await api.rotation.canRotate(args.portId);
         if (!canRotate.canRotate) {
-          return `Cannot rotate port: ${canRotate.reason}\n${canRotate.nextAvailableRotation ? `Next available rotation: ${canRotate.nextAvailableRotation}` : ''}`;
+          return describeCooldown(canRotate).join('\n');
         }
 
-        const port = await api.rotation.rotate(args.portId);
-        return `Port rotated successfully!\n\nNew device info:\n${formatPortSummary(port)}`;
+        const result = await api.rotation.rotate(args.portId);
+        const port = await api.ports.get(args.portId);
+
+        return [
+          result.message || 'Port rotated.',
+          `Rotations so far: ${result.rotationCount ?? 'unknown'}${result.rotationDurationMs != null ? `, took ${result.rotationDurationMs} ms` : ''}`,
+          'The port is on another device now and its HTTP and SOCKS5 port numbers have changed:',
+          '',
+          formatPortSummary(port),
+          '',
+          formatPortConnection(port),
+        ].join('\n');
       } catch (error) {
         throw new Error(`Failed to rotate port: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -127,18 +157,12 @@ export function createRotationToolHandlers(api: ProxiesApi, baseUrl: string) {
       try {
         const result = await api.rotation.canRotate(args.portId);
 
-        if (result.canRotate) {
-          return 'Port can be rotated now.';
-        } else {
-          const lines = [`Cannot rotate: ${result.reason}`];
-          if (result.cooldownEndsAt) {
-            lines.push(`Cooldown ends at: ${result.cooldownEndsAt}`);
-          }
-          if (result.nextAvailableRotation) {
-            lines.push(`Next available rotation: ${result.nextAvailableRotation}`);
-          }
-          return lines.join('\n');
+        if (!result.canRotate) {
+          return describeCooldown(result).join('\n');
         }
+
+        const free = result.availableDevices != null ? ` Other devices free: ${result.availableDevices}.` : '';
+        return `Port can be rotated now.${free}`;
       } catch (error) {
         throw new Error(`Failed to check rotation availability: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -185,13 +209,7 @@ export function createRotationToolHandlers(api: ProxiesApi, baseUrl: string) {
 
     async get_rotation_history(args: { portId: string; limit?: number }): Promise<string> {
       try {
-        const result = await api.rotation.getHistory(args.portId, {
-          limit: args.limit ?? 10,
-        });
-
-        // Handle both paginated response and direct array response
-        const entries = Array.isArray(result) ? result : result.data || [];
-        const total = Array.isArray(result) ? entries.length : result.total || entries.length;
+        const { rotations: entries, total } = await api.rotation.getHistory(args.portId, args.limit ?? 10);
 
         if (entries.length === 0) {
           return 'No rotation history found for this port.';
@@ -224,8 +242,8 @@ export function createRotationToolHandlers(api: ProxiesApi, baseUrl: string) {
           'Public Rotation URL:',
           rotationUrl,
           '',
-          'This URL can be called without authentication to rotate the port.',
-          'Example: curl -X GET ' + rotationUrl,
+          'A plain GET on this URL rotates the port, no API key needed. Treat it as a secret.',
+          'Example: curl ' + rotationUrl,
         ].join('\n');
       } catch (error) {
         throw new Error(`Failed to get rotation token URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -239,23 +257,23 @@ export function createRotationToolHandlers(api: ProxiesApi, baseUrl: string) {
  */
 export const rotationSchemas = {
   rotate_port: z.object({
-    portId: z.string().min(1),
+    portId: portIdSchema,
   }),
   check_rotation_availability: z.object({
-    portId: z.string().min(1),
+    portId: portIdSchema,
   }),
   configure_auto_rotation: z.object({
-    portId: z.string().min(1),
+    portId: portIdSchema,
     enabled: z.boolean(),
     intervalMinutes: z.number().min(5).max(1440).optional(),
     matchCarrier: z.boolean().optional(),
     matchCity: z.boolean().optional(),
   }),
   get_rotation_history: z.object({
-    portId: z.string().min(1),
+    portId: portIdSchema,
     limit: z.number().min(1).max(100).optional(),
   }),
   get_rotation_token_url: z.object({
-    portId: z.string().min(1),
+    portId: portIdSchema,
   }),
 };

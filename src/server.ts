@@ -2,9 +2,10 @@
  * Proxies.sx MCP Server
  * Model Context Protocol server for AI agent proxy management
  *
- * Supports two authentication modes:
- * 1. API Key Mode: Traditional API key authentication (PROXIES_API_KEY)
- * 2. x402 Mode: Wallet-based payment authentication (AGENT_WALLET_KEY)
+ * Modes:
+ * 1. API key (PROXIES_API_KEY): the standard path, an account with deposited GB
+ * 2. x402 wallet (AGENT_WALLET_KEY): optional, pay per GB in USDC without an account
+ * 3. Both set: every tool of both modes
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -17,7 +18,9 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { createProxiesApi, getAuthToken } from './api/index.js';
-import { allToolDefinitions, allSchemas, createAllToolHandlers } from './tools/index.js';
+import { allToolDefinitions, allSchemas, createAllToolHandlers, PUBLIC_TOOL_NAMES, type ToolHandlers } from './tools/index.js';
+import type { ToolAnnotations } from './tools/annotations.js';
+import { explainError } from './utils/errors.js';
 
 // x402 imports
 import {
@@ -28,6 +31,9 @@ import {
   x402ToolDefinitions,
   x402Schemas,
 } from './x402/index.js';
+
+// Compiled to CommonJS: dist/server.js sits one level below package.json.
+const { version: PACKAGE_VERSION } = require('../package.json') as { version: string };
 
 /**
  * MCP Server configuration
@@ -41,16 +47,32 @@ export interface McpServerConfig {
   // Base URL (optional)
   baseUrl?: string;
 
-  // x402 wallet authentication (Mode 2)
+  // x402 wallet authentication (Mode 2): a wallet on the Base network
   walletPrivateKey?: string;
-  preferredNetwork?: 'base' | 'solana';
   baseRpcUrl?: string;
 }
+
+interface RegisteredTool {
+  name: string;
+  description: string;
+  inputSchema: object;
+  annotations: ToolAnnotations;
+}
+
+type ArgumentSchema = { safeParse: (data: unknown) => { success: boolean; data?: unknown; error?: { message: string } } };
 
 /**
  * Default API base URL
  */
 const DEFAULT_BASE_URL = 'https://api.proxies.sx';
+
+/**
+ * Every tool adds the `/v1` prefix itself, so the base must not carry it.
+ * Both spellings of PROXIES_API_URL are accepted: with and without `/v1`.
+ */
+export function normalizeBaseUrl(baseUrl?: string): string {
+  return (baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '').replace(/\/v1$/, '');
+}
 
 /**
  * Determine which mode to use based on config
@@ -74,86 +96,45 @@ function getAuthMode(config: McpServerConfig): 'apiKey' | 'x402' | 'hybrid' {
  * Create and configure the MCP server
  */
 export async function createMcpServer(config: McpServerConfig) {
-  const baseUrl = config.baseUrl || DEFAULT_BASE_URL;
+  const baseUrl = normalizeBaseUrl(config.baseUrl);
   const authMode = getAuthMode(config);
 
-  let api: ReturnType<typeof createProxiesApi> | null = null;
-  let toolHandlers: Record<string, (args: Record<string, unknown>) => Promise<string>> = {};
-  let combinedToolDefinitions: Array<{ name: string; description: string; inputSchema: object }> = [];
-  let combinedSchemas: Record<string, { safeParse: (data: unknown) => { success: boolean; data?: unknown; error?: { message: string } } }> = {};
-
-  // Initialize API key mode if available
-  if (authMode === 'apiKey' || authMode === 'hybrid') {
+  // Account credential for the API-key tools; absent in wallet-only mode
+  let auth: Awaited<ReturnType<typeof getAuthToken>> | undefined;
+  if (authMode !== 'x402') {
     try {
-      const auth = await getAuthToken({
+      auth = await getAuthToken({
         baseUrl,
         apiKey: config.apiKey,
         email: config.email,
         password: config.password,
       });
-
-      api = createProxiesApi({
-        baseUrl: baseUrl,
-        token: auth.token,
-        authType: auth.type,
-      });
-
-      const apiHandlers = createAllToolHandlers(api, baseUrl);
-      toolHandlers = { ...toolHandlers, ...apiHandlers };
-      combinedToolDefinitions = [...allToolDefinitions];
-      combinedSchemas = { ...allSchemas };
     } catch (error) {
-      // If hybrid mode and API key fails, continue with x402 only
+      // If hybrid mode and the login fails, continue with x402 only
       if (authMode !== 'hybrid') {
         throw error;
       }
-      console.error('API key auth failed, using x402 mode only:', error);
+      console.error('Account login failed, using x402 mode only:', explainError(error instanceof Error ? error.message : String(error)));
     }
   }
 
+  // Without an account only the tools that call public routes are registered
+  const api = createProxiesApi({ baseUrl, token: auth?.token, authType: auth?.type });
+  const apiTools: RegisteredTool[] = auth
+    ? allToolDefinitions
+    : allToolDefinitions.filter(tool => PUBLIC_TOOL_NAMES.includes(tool.name));
+
+  let toolHandlers: ToolHandlers = createAllToolHandlers(api, baseUrl);
+  let combinedToolDefinitions: RegisteredTool[] = apiTools;
+  let combinedSchemas: Record<string, ArgumentSchema> = { ...allSchemas };
+
   // Initialize x402 mode if wallet is available
-  if (authMode === 'x402' || authMode === 'hybrid') {
-    const wallet = createAgentWallet(
-      config.walletPrivateKey!,
-      config.baseRpcUrl
-    );
-
+  if (config.walletPrivateKey) {
+    const wallet = createAgentWallet(config.walletPrivateKey, config.baseRpcUrl);
     const cache = createSessionCache(wallet.address);
+    const client = createX402Client(wallet, baseUrl);
 
-    const client = createX402Client(
-      wallet,
-      baseUrl,
-      config.preferredNetwork || 'base'
-    );
-
-    const x402Handlers = createX402ToolHandlers(client, wallet, cache, baseUrl);
-
-    // Add x402 handlers
-    toolHandlers = {
-      ...toolHandlers,
-      x402_get_proxy: (args) => x402Handlers.x402_get_proxy(args as Parameters<typeof x402Handlers.x402_get_proxy>[0]),
-      x402_get_pricing: (args) => x402Handlers.x402_get_pricing(args as Parameters<typeof x402Handlers.x402_get_pricing>[0]),
-      x402_list_sessions: () => x402Handlers.x402_list_sessions(),
-      x402_check_session: (args) => x402Handlers.x402_check_session(args as Parameters<typeof x402Handlers.x402_check_session>[0]),
-      x402_wallet_balance: () => x402Handlers.x402_wallet_balance(),
-      x402_rotate_ip: (args) => x402Handlers.x402_rotate_ip(args as Parameters<typeof x402Handlers.x402_rotate_ip>[0]),
-      x402_list_countries: () => x402Handlers.x402_list_countries(),
-      x402_list_cities: (args) => x402Handlers.x402_list_cities(args as Parameters<typeof x402Handlers.x402_list_cities>[0]),
-      x402_list_carriers: (args) => x402Handlers.x402_list_carriers(args as Parameters<typeof x402Handlers.x402_list_carriers>[0]),
-      x402_extend_session: (args) => x402Handlers.x402_extend_session(args as Parameters<typeof x402Handlers.x402_extend_session>[0]),
-      x402_service_status: () => x402Handlers.x402_service_status(),
-      // Pool Gateway Access (wallet-side)
-      x402_get_pool_access: (args) => x402Handlers.x402_get_pool_access(args as Parameters<typeof x402Handlers.x402_get_pool_access>[0]),
-      x402_pool_credit: (args) => x402Handlers.x402_pool_credit(args as Parameters<typeof x402Handlers.x402_pool_credit>[0]),
-      x402_pool_topup: (args) => x402Handlers.x402_pool_topup(args as Parameters<typeof x402Handlers.x402_pool_topup>[0]),
-      x402_pool_regenerate: (args) => x402Handlers.x402_pool_regenerate(args as Parameters<typeof x402Handlers.x402_pool_regenerate>[0]),
-      x402_pool_connection: (args) => x402Handlers.x402_pool_connection(args as Parameters<typeof x402Handlers.x402_pool_connection>[0]),
-      x402_pool_usage: (args) => x402Handlers.x402_pool_usage(args as Parameters<typeof x402Handlers.x402_pool_usage>[0]),
-      x402_pool_pricing: () => x402Handlers.x402_pool_pricing(),
-      get_pool_stock: () => x402Handlers.get_pool_stock(),
-    };
-
-    // Add x402 tool definitions
+    toolHandlers = { ...toolHandlers, ...(createX402ToolHandlers(client, wallet, cache) as unknown as ToolHandlers) };
     combinedToolDefinitions = [...combinedToolDefinitions, ...x402ToolDefinitions];
     combinedSchemas = { ...combinedSchemas, ...x402Schemas };
 
@@ -161,11 +142,17 @@ export async function createMcpServer(config: McpServerConfig) {
     console.error(`x402 mode enabled. Wallet: ${wallet.address}`);
   }
 
+  const registeredNames = new Set(combinedToolDefinitions.map(tool => tool.name));
+
+  // The exact credentials this process was started with, masked in every tool error
+  const startupSecrets = [config.apiKey, config.password, config.walletPrivateKey?.replace(/^0x/, '')]
+    .filter((secret): secret is string => !!secret);
+
   // Create MCP server
   const server = new Server(
     {
       name: 'proxies-sx-mcp',
-      version: '2.4.1',
+      version: PACKAGE_VERSION,
     },
     {
       capabilities: {
@@ -181,6 +168,7 @@ export async function createMcpServer(config: McpServerConfig) {
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema,
+        annotations: tool.annotations,
       })),
     };
   });
@@ -189,21 +177,13 @@ export async function createMcpServer(config: McpServerConfig) {
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
-    // Get tool handler
-    const handler = toolHandlers[name];
-    if (!handler) {
+    // Only tools listed in this mode can be called
+    const handler = registeredNames.has(name) ? toolHandlers[name] : undefined;
+    const schema = combinedSchemas[name];
+    if (!handler || !schema) {
       throw new McpError(
         ErrorCode.MethodNotFound,
         `Unknown tool: ${name}`
-      );
-    }
-
-    // Get validation schema
-    const schema = combinedSchemas[name as keyof typeof combinedSchemas];
-    if (!schema) {
-      throw new McpError(
-        ErrorCode.InternalError,
-        `No schema found for tool: ${name}`
       );
     }
 
@@ -229,14 +209,15 @@ export async function createMcpServer(config: McpServerConfig) {
         ],
       };
     } catch (error) {
-      // Handle API errors
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      // The single tool-error path: say what to do, never leak a credential
+      const rawMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = startupSecrets.reduce((text, secret) => text.split(secret).join('[redacted]'), rawMessage);
 
       return {
         content: [
           {
             type: 'text',
-            text: `Error: ${errorMessage}`,
+            text: `Error: ${explainError(errorMessage)}`,
           },
         ],
         isError: true,
@@ -244,7 +225,7 @@ export async function createMcpServer(config: McpServerConfig) {
     }
   });
 
-  return { server, api, toolHandlers };
+  return { server, api, toolHandlers, toolDefinitions: combinedToolDefinitions };
 }
 
 /**
@@ -283,7 +264,6 @@ export function getConfigFromEnv(): McpServerConfig {
 
   // x402 wallet auth
   const walletPrivateKey = process.env.AGENT_WALLET_KEY;
-  const preferredNetwork = process.env.PREFERRED_NETWORK as 'base' | 'solana' | undefined;
   const baseRpcUrl = process.env.BASE_RPC_URL;
 
   // Validate that we have at least one form of authentication
@@ -297,8 +277,7 @@ export function getConfigFromEnv(): McpServerConfig {
       '    - PROXIES_API_KEY: Your API key from https://client.proxies.sx/account\n' +
       '    - Or PROXIES_EMAIL and PROXIES_PASSWORD: Your login credentials\n' +
       '  Mode 2 (x402 Wallet - No API key needed):\n' +
-      '    - AGENT_WALLET_KEY: Your wallet private key for USDC payments\n' +
-      '    - Optional: PREFERRED_NETWORK=base or solana (default: base)'
+      '    - AGENT_WALLET_KEY: private key of a USDC wallet on the Base network'
     );
   }
 
@@ -308,7 +287,6 @@ export function getConfigFromEnv(): McpServerConfig {
     password,
     baseUrl,
     walletPrivateKey,
-    preferredNetwork,
     baseRpcUrl,
   };
 }

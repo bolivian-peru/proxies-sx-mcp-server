@@ -1,11 +1,21 @@
 /**
  * Port Tools
- * MCP tools for port management
+ * MCP tools for dedicated ports: one port bound to one carrier modem.
+ * Modems exist only in US, GB, FR, NL, PL and GE (Georgia); every other
+ * country is served by the Pool Gateway tools.
  */
 
 import { z } from 'zod';
 import type { ProxiesApi } from '../api/index.js';
-import { formatPortSummary, formatPortTable } from '../utils/formatting.js';
+import { formatPortConnection, formatPortSummary, formatPortTable, formatRelativeTime } from '../utils/formatting.js';
+import { readOnly, mutating, destructive } from './annotations.js';
+
+const OS_FINGERPRINTS = ['windows:1', 'macosx:3', 'macosx:4', 'ios:2', 'ios:1', 'android:3', 'android:1'] as const;
+const PORT_STATUS_FILTERS = ['active', 'suspended', 'expired'] as const;
+const PROXY_LOGIN = /^[A-Za-z0-9_-]{3,32}$/;
+
+/** A malformed id makes the API answer 500, so it is refused here with the way to get a real one. */
+export const portIdSchema = z.string().regex(/^[a-f0-9]{24}$/i, 'portId must be the 24-character port ID from list_ports, not the port name');
 
 /**
  * Tool definitions for port management
@@ -13,31 +23,21 @@ import { formatPortSummary, formatPortTable } from '../utils/formatting.js';
 export const portToolDefinitions = [
   {
     name: 'list_ports',
-    description: 'List all proxy ports with optional filters. Returns port names, types, status, locations, and expiration.',
+    annotations: readOnly('List Ports'),
+    description: 'List your dedicated ports with status, country, carrier, expiry and port ids. Scope ports:read.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        type: {
-          type: 'string',
-          enum: ['shared', 'private'],
-          description: 'Filter by port type',
-        },
         status: {
           type: 'string',
-          enum: ['active', 'suspended', 'expired'],
-          description: 'Filter by port status',
-        },
-        countryId: {
-          type: 'string',
-          description: 'Filter by country ID',
-        },
-        carrierId: {
-          type: 'string',
-          description: 'Filter by carrier ID',
+          enum: PORT_STATUS_FILTERS,
+          description: 'Only show ports in this state',
         },
         limit: {
           type: 'number',
-          description: 'Maximum number of ports to return (default: 50)',
+          minimum: 1,
+          maximum: 100,
+          description: 'Maximum number of ports to show (default: 50)',
         },
       },
       required: [] as string[],
@@ -45,7 +45,8 @@ export const portToolDefinitions = [
   },
   {
     name: 'get_port',
-    description: 'Get detailed information about a specific port by ID',
+    annotations: readOnly('Get Port'),
+    description: 'Get one dedicated port with its location and ready-to-use HTTP and SOCKS5 connection strings (contains the port password). Scope ports:read.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -59,43 +60,42 @@ export const portToolDefinitions = [
   },
   {
     name: 'create_port',
-    description: 'Create a new proxy port in a specific country. Requires available slots and optionally carrier/city targeting.',
+    annotations: mutating('Create Port'),
+    description: 'Create a dedicated port on a carrier modem and return its connection strings. Uses one free port slot; traffic is metered from the account balance. Only countries from list_available_countries work (carrier modems in US, GB, FR, NL, PL, GE). Scope ports:write.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         countryId: {
           type: 'string',
-          description: 'Country ID for the port (use list_available_countries to get IDs)',
-        },
-        type: {
-          type: 'string',
-          enum: ['shared', 'private'],
-          description: 'Port type (shared or private)',
+          description: 'countryId from list_available_countries (an id, not a country code)',
         },
         carrierId: {
           type: 'string',
-          description: 'Optional carrier ID for specific carrier targeting',
+          description: 'Optional carrierId from list_available_countries(countryId)',
         },
         cityId: {
           type: 'string',
-          description: 'Optional city ID for specific city targeting',
+          description: 'Optional cityId from list_available_countries(countryId)',
         },
         expiresInDays: {
           type: 'number',
-          description: 'Port expiration in days (1-365, default: 30)',
+          minimum: 1,
+          maximum: 365,
+          description: 'Port lifetime in days (default: 30). Time is free.',
         },
         osFingerprint: {
           type: 'string',
-          enum: ['', 'windows:1', 'macosx:3', 'macosx:4', 'ios:2', 'ios:1', 'android:3', 'android:1'],
-          description: 'Optional OS fingerprint spoofing',
+          enum: OS_FINGERPRINTS,
+          description: 'Optional OS fingerprint (see get_os_fingerprint_options)',
         },
       },
-      required: ['countryId', 'type'],
+      required: ['countryId'],
     },
   },
   {
     name: 'delete_port',
-    description: 'Delete a proxy port by ID. This will remove the port from the proxy server.',
+    annotations: destructive('Delete Port'),
+    description: 'Delete a dedicated port and free its slot. Its credentials stop working. Scope ports:write.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -109,7 +109,8 @@ export const portToolDefinitions = [
   },
   {
     name: 'update_port_credentials',
-    description: 'Update the login and/or password for a proxy port',
+    annotations: mutating('Update Port Credentials', true),
+    description: 'Change the login and/or password of a dedicated port. Scope ports:write.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -119,11 +120,15 @@ export const portToolDefinitions = [
         },
         proxyLogin: {
           type: 'string',
-          description: 'New proxy login username',
+          minLength: 3,
+          maxLength: 32,
+          description: 'New login: 3-32 characters, letters, digits, _ and -',
         },
         proxyPassword: {
           type: 'string',
-          description: 'New proxy password',
+          minLength: 8,
+          maxLength: 64,
+          description: 'New password: 8-64 characters',
         },
       },
       required: ['portId'],
@@ -131,7 +136,8 @@ export const portToolDefinitions = [
   },
   {
     name: 'update_os_fingerprint',
-    description: 'Update the OS fingerprint (p0f) for a port to spoof the operating system',
+    annotations: mutating('Update OS Fingerprint', true),
+    description: 'Set the OS fingerprint (TCP/IP signature) a dedicated port presents. The API cannot clear a fingerprint once set. Scope ports:write.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -141,8 +147,8 @@ export const portToolDefinitions = [
         },
         osFingerprint: {
           type: 'string',
-          enum: ['', 'windows:1', 'macosx:3', 'macosx:4', 'ios:2', 'ios:1', 'android:3', 'android:1'],
-          description: 'OS fingerprint value (empty string to disable)',
+          enum: OS_FINGERPRINTS,
+          description: 'OS fingerprint value (see get_os_fingerprint_options)',
         },
       },
       required: ['portId', 'osFingerprint'],
@@ -150,7 +156,8 @@ export const portToolDefinitions = [
   },
   {
     name: 'reconfigure_port',
-    description: 'Reconfigure a port to use a different location (country, carrier, city)',
+    annotations: destructive('Reconfigure Port'),
+    description: 'Move a dedicated port to another country, carrier or city. This creates a NEW port (new id, login and port numbers) and removes the old one, so read the returned connection strings. Limited to 3 calls per 2 minutes and shares the 5-minute cooldown with rotate_port. Scope ports:write.',
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -160,18 +167,38 @@ export const portToolDefinitions = [
         },
         countryId: {
           type: 'string',
-          description: 'New country ID',
+          description: 'New countryId from list_available_countries',
         },
         carrierId: {
           type: 'string',
-          description: 'Optional new carrier ID',
+          description: 'Optional new carrierId',
         },
         cityId: {
           type: 'string',
-          description: 'Optional new city ID',
+          description: 'Optional new cityId',
         },
       },
       required: ['portId', 'countryId'],
+    },
+  },
+  {
+    name: 'extend_port',
+    annotations: mutating('Extend Port'),
+    description: 'Add hours to a dedicated port\'s expiry. Time is free; the answer includes how many hours the account still allows. Scope ports:write.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        portId: {
+          type: 'string',
+          description: 'The port ID to extend',
+        },
+        hours: {
+          type: 'number',
+          minimum: 1,
+          description: 'Hours to add',
+        },
+      },
+      required: ['portId', 'hours'],
     },
   },
 ] as const;
@@ -182,27 +209,23 @@ export const portToolDefinitions = [
 export function createPortToolHandlers(api: ProxiesApi) {
   return {
     async list_ports(args: {
-      type?: 'shared' | 'private';
-      status?: 'active' | 'suspended' | 'expired';
-      countryId?: string;
-      carrierId?: string;
+      status?: (typeof PORT_STATUS_FILTERS)[number];
       limit?: number;
     }): Promise<string> {
       try {
-        const result = await api.ports.list({
-          type: args.type,
-          status: args.status,
-          countryId: args.countryId,
-          carrierId: args.carrierId,
-          limit: args.limit ?? 50,
+        const all = await api.ports.list();
+        const matching = all.filter(port => {
+          if (!args.status) return true;
+          if (args.status === 'suspended') return port.suspended;
+          return port.status === args.status;
         });
 
-        if (result.data.length === 0) {
+        if (matching.length === 0) {
           return 'No ports found matching the criteria.';
         }
 
-        const table = formatPortTable(result.data);
-        return `Found ${result.total} ports (showing ${result.data.length}):\n\n${table}`;
+        const shown = matching.slice(0, args.limit ?? 50);
+        return `Found ${matching.length} ports (showing ${shown.length}):\n\n${formatPortTable(shown)}`;
       } catch (error) {
         throw new Error(`Failed to list ports: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -211,13 +234,7 @@ export function createPortToolHandlers(api: ProxiesApi) {
     async get_port(args: { portId: string }): Promise<string> {
       try {
         const port = await api.ports.get(args.portId);
-        const summary = formatPortSummary(port);
-
-        // Add connection strings for easy copy-paste
-        const httpProxy = `http://${port.proxyLogin}:${port.proxyPassword}@${port.serverIp}:${port.httpPort}`;
-        const socksProxy = `socks5://${port.proxyLogin}:${port.proxyPassword}@${port.serverIp}:${port.socksPort}`;
-
-        return `${summary}\n\nConnection Strings (ready to use):\n  HTTP:   ${httpProxy}\n  SOCKS5: ${socksProxy}`;
+        return `${formatPortSummary(port)}\n\n${formatPortConnection(port)}`;
       } catch (error) {
         throw new Error(`Failed to get port: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -225,7 +242,6 @@ export function createPortToolHandlers(api: ProxiesApi) {
 
     async create_port(args: {
       countryId: string;
-      type: 'shared' | 'private';
       carrierId?: string;
       cityId?: string;
       expiresInDays?: number;
@@ -234,25 +250,16 @@ export function createPortToolHandlers(api: ProxiesApi) {
       try {
         // Convert days to seconds (default 30 days)
         const days = args.expiresInDays ?? 30;
-        const expiresAt = days * 24 * 60 * 60; // days to seconds
 
-        const result = await api.ports.create({
+        const port = await api.ports.create({
           countryId: args.countryId,
-          isPrivate: args.type === 'private',
           carrierId: args.carrierId,
           cityId: args.cityId,
-          expiresAt,
+          expiresAt: days * 24 * 60 * 60,
           osFingerprint: args.osFingerprint,
         });
 
-        // Backend may return { port: Port, message: string } or just Port directly
-        const port = 'port' in result ? result.port : result;
-
-        // Build connection strings for immediate use
-        const httpProxy = `http://${port.proxyLogin}:${port.proxyPassword}@${port.serverIp}:${port.httpPort}`;
-        const socksProxy = `socks5://${port.proxyLogin}:${port.proxyPassword}@${port.serverIp}:${port.socksPort}`;
-
-        return `Port created successfully!\n\n${formatPortSummary(port)}\n\nConnection Strings (ready to use):\n  HTTP:   ${httpProxy}\n  SOCKS5: ${socksProxy}`;
+        return `Port created successfully!\n\n${formatPortSummary(port)}\n\n${formatPortConnection(port)}`;
       } catch (error) {
         throw new Error(`Failed to create port: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -294,8 +301,7 @@ export function createPortToolHandlers(api: ProxiesApi) {
     }): Promise<string> {
       try {
         const port = await api.ports.updateOsFingerprint(args.portId, args.osFingerprint);
-        const fingerprint = port.osFingerprint || 'None (disabled)';
-        return `OS fingerprint updated to: ${fingerprint}`;
+        return `OS fingerprint updated to: ${port.osFingerprint || args.osFingerprint}`;
       } catch (error) {
         throw new Error(`Failed to update OS fingerprint: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
@@ -314,9 +320,30 @@ export function createPortToolHandlers(api: ProxiesApi) {
           cityId: args.cityId,
         });
 
-        return `Port reconfigured successfully!\n\n${formatPortSummary(port)}`;
+        return [
+          `Port reconfigured. It is now a NEW port: use ID ${port._id} from here on, the old ID ${args.portId} no longer exists.`,
+          '',
+          formatPortSummary(port),
+          '',
+          formatPortConnection(port),
+        ].join('\n');
       } catch (error) {
         throw new Error(`Failed to reconfigure port: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    },
+
+    async extend_port(args: { portId: string; hours: number }): Promise<string> {
+      try {
+        const result = await api.ports.extend(args.portId, args.hours);
+        const remaining = await api.ports.getMaxExtendHours(args.portId);
+
+        return [
+          result.message || `Port extended by ${args.hours} hours.`,
+          `New expiry: ${new Date(result.newExpiresAt).toISOString()} (${formatRelativeTime(new Date(result.newExpiresAt))})`,
+          `Hours still available to add: ${remaining.maxHoursAllowed}`,
+        ].join('\n');
+      } catch (error) {
+        throw new Error(`Failed to extend port: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
   };
@@ -327,39 +354,39 @@ export function createPortToolHandlers(api: ProxiesApi) {
  */
 export const portSchemas = {
   list_ports: z.object({
-    type: z.enum(['shared', 'private']).optional(),
-    status: z.enum(['active', 'suspended', 'expired']).optional(),
-    countryId: z.string().optional(),
-    carrierId: z.string().optional(),
+    status: z.enum(PORT_STATUS_FILTERS).optional(),
     limit: z.number().min(1).max(100).optional(),
   }),
   get_port: z.object({
-    portId: z.string().min(1),
+    portId: portIdSchema,
   }),
   create_port: z.object({
     countryId: z.string().min(1),
-    type: z.enum(['shared', 'private']),
     carrierId: z.string().optional(),
     cityId: z.string().optional(),
     expiresInDays: z.number().min(1).max(365).optional(),
-    osFingerprint: z.enum(['', 'windows:1', 'macosx:3', 'macosx:4', 'ios:2', 'ios:1', 'android:3', 'android:1']).optional(),
+    osFingerprint: z.enum(OS_FINGERPRINTS).optional(),
   }),
   delete_port: z.object({
-    portId: z.string().min(1),
+    portId: portIdSchema,
   }),
   update_port_credentials: z.object({
-    portId: z.string().min(1),
-    proxyLogin: z.string().optional(),
-    proxyPassword: z.string().optional(),
+    portId: portIdSchema,
+    proxyLogin: z.string().regex(PROXY_LOGIN).optional(),
+    proxyPassword: z.string().min(8).max(64).optional(),
   }),
   update_os_fingerprint: z.object({
-    portId: z.string().min(1),
-    osFingerprint: z.enum(['', 'windows:1', 'macosx:3', 'macosx:4', 'ios:2', 'ios:1', 'android:3', 'android:1']),
+    portId: portIdSchema,
+    osFingerprint: z.enum(OS_FINGERPRINTS),
   }),
   reconfigure_port: z.object({
-    portId: z.string().min(1),
+    portId: portIdSchema,
     countryId: z.string().min(1),
     carrierId: z.string().optional(),
     cityId: z.string().optional(),
+  }),
+  extend_port: z.object({
+    portId: portIdSchema,
+    hours: z.number().min(1),
   }),
 };

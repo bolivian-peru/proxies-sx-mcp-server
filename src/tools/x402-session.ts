@@ -5,6 +5,8 @@
 
 import { z } from 'zod';
 import type { ProxiesApi } from '../api/index.js';
+import type { X402TopupResult } from '../x402/types.js';
+import { readOnly, mutating, destructive } from './annotations.js';
 
 // ==================== SCHEMAS ====================
 
@@ -63,6 +65,7 @@ export const x402SessionSchemas = {
 export const x402SessionToolDefinitions = [
   {
     name: 'get_x402_session',
+    annotations: readOnly('Get x402 Session'),
     description: 'Get details of your x402 session including all ports. Use this after purchase to retrieve your proxy credentials and session info. Requires the session token from the purchase response.',
     inputSchema: {
       type: 'object',
@@ -77,6 +80,7 @@ export const x402SessionToolDefinitions = [
   },
   {
     name: 'list_x402_ports',
+    annotations: readOnly('List x402 Ports'),
     description: 'List all ports in your x402 session with connection strings and expiration times',
     inputSchema: {
       type: 'object',
@@ -91,6 +95,7 @@ export const x402SessionToolDefinitions = [
   },
   {
     name: 'get_x402_port_status',
+    annotations: readOnly('Get x402 Port Status'),
     description: 'Get detailed status of a specific port including traffic usage and connection info',
     inputSchema: {
       type: 'object',
@@ -109,6 +114,7 @@ export const x402SessionToolDefinitions = [
   },
   {
     name: 'get_sessions_by_wallet',
+    annotations: readOnly('Get Sessions by Wallet'),
     description: 'List all x402 sessions associated with your wallet address. Useful for recovering session info.',
     inputSchema: {
       type: 'object',
@@ -128,6 +134,7 @@ export const x402SessionToolDefinitions = [
   },
   {
     name: 'get_session_status',
+    annotations: readOnly('Get Session Status'),
     description: 'Get quick status check for a session including traffic usage and expiration',
     inputSchema: {
       type: 'object',
@@ -142,7 +149,8 @@ export const x402SessionToolDefinitions = [
   },
   {
     name: 'replace_x402_port',
-    description: 'Replace an offline/broken proxy port with a new one on a different device. Free, max 3 replacements per session. The broken port is deleted and a new port is created on a different device.',
+    annotations: destructive('Replace x402 Port'),
+    description: 'Replace an offline port of an x402 session with a new port on another device, at no charge. The old port is deleted and the number of replacements per session is limited.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -172,7 +180,8 @@ export const x402SessionToolDefinitions = [
   },
   {
     name: 'calculate_x402_topup',
-    description: 'Calculate the cost to top up a session with additional traffic and/or duration. Duration extensions are free, traffic costs $4/GB.',
+    annotations: readOnly('Calculate x402 Top-up'),
+    description: 'Calculate what it costs to add traffic and/or time to an x402 session. Time is free; traffic is charged at the session\'s per-GB rate.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -194,7 +203,8 @@ export const x402SessionToolDefinitions = [
   },
   {
     name: 'topup_x402_session',
-    description: 'Top up a session with additional traffic and/or duration. Requires a Payment-Signature (tx hash) for traffic top-ups. Duration-only extensions are free.',
+    annotations: mutating('Top Up x402 Session'),
+    description: 'Add traffic and/or time to an x402 session. Adding traffic needs the transaction hash of a USDC payment for the amount calculate_x402_topup returned; adding time only is free.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -266,363 +276,308 @@ interface X402SessionStatus {
   };
 }
 
+interface X402ReplaceResult {
+  portId: string;
+  rotationUrl: string;
+  proxy: { http: string; socks5: string; expiresAt: string };
+  traffic: { allocatedGB: number; usedGB: number; remainingGB: number };
+  location: { country: string; countryCode: string };
+}
+
+interface X402TopupQuote {
+  trafficCost: number;
+  durationCost: number;
+  totalCost: number;
+  breakdown: { addTrafficGB: number; addDurationSeconds: number; trafficPricePerGB: number; tier: string };
+}
+
 // ==================== HANDLERS ====================
 
-export function createX402SessionToolHandlers(api: ProxiesApi, _baseUrl: string) {
+function expiresIn(seconds?: number): string {
+  if (!seconds) return 'unknown';
+  if (seconds > 3600) return `${(seconds / 3600).toFixed(1)} hours`;
+  return `${Math.round(seconds / 60)} minutes`;
+}
+
+/**
+ * These routes authenticate with the x402 session token, sent as the
+ * X-Session-Token header. Errors propagate to the server's single tool-error path.
+ */
+export function createX402SessionToolHandlers(api: ProxiesApi) {
+  const withToken = (sessionToken: string) => ({ 'X-Session-Token': sessionToken });
+
   return {
     /**
      * Get session details via session token
      */
     async get_x402_session(args: z.infer<typeof getSessionSchema>): Promise<string> {
-      try {
-        const session = await api.client.get<X402SessionDetails & { ports: X402PortInfo[] }>(
-          '/x402/manage/session',
-          undefined, // no query params
-          { 'X-Session-Token': args.sessionToken },
-        );
+      const session = await api.client.get<X402SessionDetails>(
+        '/v1/x402/manage/session',
+        undefined,
+        withToken(args.sessionToken),
+      );
 
-        const lines = [
-          '# X402 Session Details',
-          '',
-          `**Session ID:** ${session.sessionId}`,
-          `**Wallet:** ${session.walletAddress}`,
-          `**Network:** ${session.network}`,
-          `**Tier:** ${session.tier}`,
-          `**Status:** ${session.isActive ? 'Active' : 'Expired'}`,
-          '',
-          '## Payment',
-          `- **Amount:** $${session.amountUSDC} USDC`,
-          `- **TX Hash:** ${session.txHash}`,
-          '',
-          '## Traffic',
-          `- **Allocated:** ${session.trafficAllocatedGB} GB`,
-          `- **Used:** ${session.trafficUsedGB} GB`,
-          `- **Remaining:** ${(session.trafficAllocatedGB - session.trafficUsedGB).toFixed(2)} GB`,
-          '',
-          '## Expiration',
-          `- **Expires At:** ${session.expiresAt}`,
-          '',
-        ];
+      const lines = [
+        '# X402 Session Details',
+        '',
+        `**Session ID:** ${session.sessionId}`,
+        `**Wallet:** ${session.walletAddress}`,
+        `**Network:** ${session.network}`,
+        `**Tier:** ${session.tier}`,
+        `**Status:** ${session.isActive ? 'Active' : 'Expired'}`,
+        '',
+        '## Payment',
+        `- **Amount:** $${session.amountUSDC} USDC`,
+        `- **TX Hash:** ${session.txHash}`,
+        '',
+        '## Traffic',
+        `- **Allocated:** ${session.trafficAllocatedGB} GB`,
+        `- **Used:** ${session.trafficUsedGB} GB`,
+        `- **Remaining:** ${(session.trafficAllocatedGB - session.trafficUsedGB).toFixed(2)} GB`,
+        '',
+        '## Expiration',
+        `- **Expires At:** ${session.expiresAt}`,
+        '',
+      ];
 
-        if (session.ports && session.ports.length > 0) {
-          lines.push('## Ports');
-          lines.push('');
-          for (const port of session.ports) {
-            lines.push(`### ${port.displayName || port.id}`);
-            lines.push(`- **HTTP:** \`${port.http}\``);
-            lines.push(`- **SOCKS5:** \`${port.socks5}\``);
-            lines.push(`- **Rotation URL:** ${port.rotationUrl}`);
-            lines.push(`- **Expires:** ${port.expiresAt}`);
-            lines.push('');
-          }
-        }
-
-        return lines.join('\n');
-      } catch (error: any) {
-        if (error.statusCode === 404) {
-          return 'Session not found or expired. The session token may be invalid.';
-        }
-        return `Error fetching session: ${error.message}`;
+      for (const port of session.ports ?? []) {
+        lines.push(`### ${port.displayName || port.id}`);
+        lines.push(`- **HTTP:** \`${port.http}\``);
+        lines.push(`- **SOCKS5:** \`${port.socks5}\``);
+        lines.push(`- **Rotation URL:** ${port.rotationUrl}`);
+        lines.push(`- **Expires:** ${port.expiresAt}`);
+        lines.push('');
       }
+
+      return lines.join('\n');
     },
 
     /**
      * List all ports in session
      */
     async list_x402_ports(args: z.infer<typeof getSessionSchema>): Promise<string> {
-      try {
-        const result = await api.client.get<{ ports: X402PortInfo[] }>(
-          '/x402/manage/ports',
-          undefined,
-          { 'X-Session-Token': args.sessionToken },
-        );
+      const result = await api.client.get<{ ports: X402PortInfo[] }>(
+        '/v1/x402/manage/ports',
+        undefined,
+        withToken(args.sessionToken),
+      );
 
-        if (!result.ports || result.ports.length === 0) {
-          return 'No ports found in this session.';
-        }
-
-        const lines = [
-          '# Session Ports',
-          '',
-          `Total: ${result.ports.length} port(s)`,
-          '',
-        ];
-
-        for (const port of result.ports) {
-          const expiresIn = port.expiresInSeconds
-            ? port.expiresInSeconds > 3600
-              ? `${(port.expiresInSeconds / 3600).toFixed(1)} hours`
-              : `${Math.round(port.expiresInSeconds / 60)} minutes`
-            : 'unknown';
-
-          lines.push(`## ${port.displayName || port.id}`);
-          lines.push('');
-          lines.push('**Connection Strings:**');
-          lines.push('```');
-          lines.push(`HTTP:   ${port.http}`);
-          lines.push(`SOCKS5: ${port.socks5}`);
-          lines.push('```');
-          lines.push('');
-          lines.push(`- **Expires in:** ${expiresIn}`);
-          lines.push(`- **Rotation URL:** ${port.rotationUrl}`);
-          lines.push('');
-        }
-
-        return lines.join('\n');
-      } catch (error: any) {
-        return `Error listing ports: ${error.message}`;
+      if (!result.ports || result.ports.length === 0) {
+        return 'No ports found in this session.';
       }
+
+      const lines = ['# Session Ports', '', `Total: ${result.ports.length} port(s)`, ''];
+
+      for (const port of result.ports) {
+        lines.push(`## ${port.displayName || port.id}`);
+        lines.push('');
+        lines.push('**Connection Strings:**');
+        lines.push('```');
+        lines.push(`HTTP:   ${port.http}`);
+        lines.push(`SOCKS5: ${port.socks5}`);
+        lines.push('```');
+        lines.push('');
+        lines.push(`- **Expires in:** ${expiresIn(port.expiresInSeconds)}`);
+        lines.push(`- **Rotation URL:** ${port.rotationUrl}`);
+        lines.push('');
+      }
+
+      return lines.join('\n');
     },
 
     /**
      * Get port status
      */
     async get_x402_port_status(args: z.infer<typeof getPortStatusSchema>): Promise<string> {
-      try {
-        const port = await api.client.get<X402PortInfo>(
-          `/x402/manage/ports/${args.portId}/status`,
-          undefined,
-          { 'X-Session-Token': args.sessionToken },
-        );
+      const port = await api.client.get<X402PortInfo>(
+        `/v1/x402/manage/ports/${args.portId}/status`,
+        undefined,
+        withToken(args.sessionToken),
+      );
 
-        const expiresIn = port.expiresInSeconds
-          ? port.expiresInSeconds > 3600
-            ? `${(port.expiresInSeconds / 3600).toFixed(1)} hours`
-            : `${Math.round(port.expiresInSeconds / 60)} minutes`
-          : 'unknown';
+      const lines = [
+        `# Port Status: ${port.displayName || port.id}`,
+        '',
+        `**Status:** ${port.status || 'active'}`,
+        `**Expires in:** ${expiresIn(port.expiresInSeconds)}`,
+        `**Expires at:** ${port.expiresAt}`,
+        '',
+        '## Connection',
+        '```',
+        `HTTP:   ${port.http}`,
+        `SOCKS5: ${port.socks5}`,
+        '```',
+        '',
+        '## Rotation',
+        `**Rotation URL:** ${port.rotationUrl}`,
+        '',
+      ];
 
-        const lines = [
-          `# Port Status: ${port.displayName || port.id}`,
-          '',
-          `**Status:** ${port.status || 'active'}`,
-          `**Expires in:** ${expiresIn}`,
-          `**Expires at:** ${port.expiresAt}`,
-          '',
-          '## Connection',
-          '```',
-          `HTTP:   ${port.http}`,
-          `SOCKS5: ${port.socks5}`,
-          '```',
-          '',
-          '## IP Rotation',
-          `**Rotation URL:** ${port.rotationUrl}`,
-          '',
-        ];
-
-        if (port.traffic) {
-          lines.push('## Traffic Usage');
-          lines.push(`- **Used:** ${port.traffic.usedGB} GB (${port.traffic.usedBytes.toLocaleString()} bytes)`);
-        }
-
-        return lines.join('\n');
-      } catch (error: any) {
-        if (error.statusCode === 404) {
-          return 'Port not found or not owned by this session.';
-        }
-        return `Error fetching port status: ${error.message}`;
+      if (port.traffic) {
+        lines.push('## Traffic Usage');
+        lines.push(`- **Used:** ${port.traffic.usedGB} GB (${port.traffic.usedBytes.toLocaleString()} bytes)`);
       }
+
+      return lines.join('\n');
     },
 
     /**
      * Get sessions by wallet address
      */
     async get_sessions_by_wallet(args: z.infer<typeof getSessionByWalletSchema>): Promise<string> {
-      try {
-        const status = args.status || 'active';
-        const result = await api.client.get<{ sessions: X402SessionDetails[]; total: number }>(
-          `/x402/sessions/wallet/${args.walletAddress}?status=${status}`
-        );
+      const status = args.status || 'active';
+      const result = await api.client.get<{ sessions: X402SessionDetails[]; total: number }>(
+        `/v1/x402/sessions/wallet/${args.walletAddress}`,
+        { status },
+      );
 
-        if (!result.sessions || result.sessions.length === 0) {
-          return `No ${status} sessions found for wallet ${args.walletAddress}`;
-        }
-
-        const lines = [
-          '# Your X402 Sessions',
-          '',
-          `**Wallet:** ${args.walletAddress}`,
-          `**Filter:** ${status}`,
-          `**Total:** ${result.total} session(s)`,
-          '',
-        ];
-
-        for (const session of result.sessions) {
-          const statusIcon = session.isActive ? '🟢' : '🔴';
-          lines.push(`## ${statusIcon} Session ${session.sessionId.slice(-8)}`);
-          lines.push(`- **ID:** ${session.sessionId}`);
-          lines.push(`- **Tier:** ${session.tier}`);
-          lines.push(`- **Ports:** ${session.portCount}`);
-          lines.push(`- **Amount:** $${session.amountUSDC} USDC`);
-          lines.push(`- **Traffic:** ${session.trafficUsedGB}/${session.trafficAllocatedGB} GB`);
-          lines.push(`- **Expires:** ${session.expiresAt}`);
-          lines.push(`- **TX:** ${session.txHash}`);
-          lines.push('');
-        }
-
-        return lines.join('\n');
-      } catch (error: any) {
-        return `Error fetching sessions: ${error.message}`;
+      if (!result.sessions || result.sessions.length === 0) {
+        return `No ${status} sessions found for wallet ${args.walletAddress}`;
       }
+
+      const lines = [
+        '# Your X402 Sessions',
+        '',
+        `**Wallet:** ${args.walletAddress}`,
+        `**Filter:** ${status}`,
+        `**Total:** ${result.total} session(s)`,
+        '',
+      ];
+
+      for (const session of result.sessions) {
+        lines.push(`## Session ${session.sessionId.slice(-8)} (${session.isActive ? 'active' : 'expired'})`);
+        lines.push(`- **ID:** ${session.sessionId}`);
+        lines.push(`- **Tier:** ${session.tier}`);
+        lines.push(`- **Ports:** ${session.portCount}`);
+        lines.push(`- **Amount:** $${session.amountUSDC} USDC`);
+        lines.push(`- **Traffic:** ${session.trafficUsedGB}/${session.trafficAllocatedGB} GB`);
+        lines.push(`- **Expires:** ${session.expiresAt}`);
+        lines.push(`- **TX:** ${session.txHash}`);
+        lines.push('');
+      }
+
+      return lines.join('\n');
     },
 
     /**
      * Get session status
      */
     async get_session_status(args: z.infer<typeof getSessionStatusSchema>): Promise<string> {
-      try {
-        const status = await api.client.get<X402SessionStatus>(
-          `/x402/sessions/${args.sessionId}/status`
-        );
+      const status = await api.client.get<X402SessionStatus>(`/v1/x402/sessions/${args.sessionId}/status`);
 
-        const statusIcon = status.status === 'active' ? '🟢 Active' : '🔴 Expired';
-        const trafficPercent = status.traffic.percentUsed;
-        const trafficBar = '█'.repeat(Math.floor(trafficPercent / 10)) + '░'.repeat(10 - Math.floor(trafficPercent / 10));
-
-        return [
-          `# Session Status: ${statusIcon}`,
-          '',
-          `**ID:** ${status.id}`,
-          `**Wallet:** ${status.walletAddress}`,
-          `**Expires:** ${status.expiresAt}`,
-          '',
-          '## Traffic Usage',
-          `[${trafficBar}] ${trafficPercent.toFixed(1)}%`,
-          '',
-          `- **Allowed:** ${status.traffic.allowedGB} GB`,
-          `- **Used:** ${status.traffic.usedGB} GB`,
-          `- **Remaining:** ${status.traffic.remainingGB} GB`,
-        ].join('\n');
-      } catch (error: any) {
-        if (error.statusCode === 404) {
-          return 'Session not found. Check the session ID.';
-        }
-        return `Error fetching session status: ${error.message}`;
-      }
+      return [
+        `# Session Status: ${status.status}`,
+        '',
+        `**ID:** ${status.id}`,
+        `**Wallet:** ${status.walletAddress}`,
+        `**Expires:** ${status.expiresAt}`,
+        '',
+        '## Traffic Usage',
+        `- **Allowed:** ${status.traffic.allowedGB} GB`,
+        `- **Used:** ${status.traffic.usedGB} GB (${status.traffic.percentUsed.toFixed(1)}%)`,
+        `- **Remaining:** ${status.traffic.remainingGB} GB`,
+      ].join('\n');
     },
 
     /**
      * Replace an offline/broken port with a new one
      */
     async replace_x402_port(args: z.infer<typeof replacePortSchema>): Promise<string> {
-      try {
-        const body: any = {};
-        if (args.portId) body.portId = args.portId;
-        if (args.country) body.country = args.country;
-        if (args.city) body.city = args.city;
-        if (args.carrier) body.carrier = args.carrier;
+      const { sessionToken, ...body } = args;
+      const result = await api.client.post<X402ReplaceResult>(
+        '/v1/x402/manage/ports/replace',
+        body,
+        undefined,
+        withToken(sessionToken),
+      );
 
-        const result = await api.client.post<any>(
-          '/x402/manage/ports/replace',
-          body,
-          { 'X-Session-Token': args.sessionToken },
-        );
-
-        return [
-          '# Port Replaced Successfully',
-          '',
-          '## New Proxy Credentials',
-          '```',
-          `HTTP:   ${result.proxy.http}`,
-          `SOCKS5: ${result.proxy.socks5}`,
-          '```',
-          '',
-          `**Port ID:** ${result.portId}`,
-          `**Expires:** ${result.proxy.expiresAt}`,
-          `**Rotation URL:** ${result.rotationUrl}`,
-          '',
-          '## Traffic',
-          `- **Allocated:** ${result.traffic.allocatedGB} GB`,
-          `- **Used:** ${result.traffic.usedGB} GB`,
-          `- **Remaining:** ${result.traffic.remainingGB} GB`,
-          '',
-          `**Location:** ${result.location.country} (${result.location.countryCode})`,
-        ].join('\n');
-      } catch (error: any) {
-        return `Error replacing port: ${error.message}`;
-      }
+      return [
+        '# Port Replaced Successfully',
+        '',
+        '## New Proxy Credentials',
+        '```',
+        `HTTP:   ${result.proxy.http}`,
+        `SOCKS5: ${result.proxy.socks5}`,
+        '```',
+        '',
+        `**Port ID:** ${result.portId}`,
+        `**Expires:** ${result.proxy.expiresAt}`,
+        `**Rotation URL:** ${result.rotationUrl}`,
+        '',
+        '## Traffic',
+        `- **Allocated:** ${result.traffic.allocatedGB} GB`,
+        `- **Used:** ${result.traffic.usedGB} GB`,
+        `- **Remaining:** ${result.traffic.remainingGB} GB`,
+        '',
+        `**Location:** ${result.location.country} (${result.location.countryCode})`,
+      ].join('\n');
     },
 
     /**
      * Calculate top-up cost
      */
     async calculate_x402_topup(args: z.infer<typeof topupCalculateSchema>): Promise<string> {
-      try {
-        const params: Record<string, string> = {};
-        if (args.addTrafficGB) params.addTrafficGB = String(args.addTrafficGB);
-        if (args.addDurationSeconds) params.addDurationSeconds = String(args.addDurationSeconds);
+      const result = await api.client.get<X402TopupQuote>(
+        '/v1/x402/manage/session/topup/calculate',
+        { addTrafficGB: args.addTrafficGB, addDurationSeconds: args.addDurationSeconds },
+        withToken(args.sessionToken),
+      );
 
-        const queryString = new URLSearchParams(params).toString();
-        const result = await api.client.get<any>(
-          `/x402/manage/session/topup/calculate?${queryString}`,
-          undefined,
-          { 'X-Session-Token': args.sessionToken },
-        );
-
-        return [
-          '# Top-Up Cost Calculation',
-          '',
-          `**Traffic Cost:** $${result.trafficCost}`,
-          `**Duration Cost:** $${result.durationCost} (duration is free)`,
-          `**Total Cost:** $${result.totalCost} USDC`,
-          '',
-          '## Breakdown',
-          `- **Add Traffic:** ${result.breakdown.addTrafficGB} GB`,
-          `- **Add Duration:** ${result.breakdown.addDurationSeconds} seconds`,
-          `- **Traffic Price:** $${result.breakdown.trafficPricePerGB}/GB`,
-          `- **Tier:** ${result.breakdown.tier}`,
-          '',
-          result.totalCost > 0
-            ? 'Send the total amount in USDC, then call topup_x402_session with the tx hash.'
-            : 'This is a free duration-only extension. Call topup_x402_session with any string as payment signature.',
-        ].join('\n');
-      } catch (error: any) {
-        return `Error calculating top-up cost: ${error.message}`;
-      }
+      return [
+        '# Top-Up Cost Calculation',
+        '',
+        `**Traffic Cost:** $${result.trafficCost}`,
+        `**Duration Cost:** $${result.durationCost} (duration is free)`,
+        `**Total Cost:** $${result.totalCost} USDC`,
+        '',
+        '## Breakdown',
+        `- **Add Traffic:** ${result.breakdown.addTrafficGB} GB`,
+        `- **Add Duration:** ${result.breakdown.addDurationSeconds} seconds`,
+        `- **Traffic Price:** $${result.breakdown.trafficPricePerGB}/GB`,
+        `- **Tier:** ${result.breakdown.tier}`,
+        '',
+        result.totalCost > 0
+          ? 'Send the total amount in USDC, then call topup_x402_session with the tx hash.'
+          : 'This is a free duration-only extension. Call topup_x402_session with any string as payment signature.',
+      ].join('\n');
     },
 
     /**
      * Top up a session with additional traffic/duration
      */
     async topup_x402_session(args: z.infer<typeof topupSessionSchema>): Promise<string> {
-      try {
-        const body: any = {};
-        if (args.addTrafficGB) body.addTrafficGB = args.addTrafficGB;
-        if (args.addDurationSeconds) body.addDurationSeconds = args.addDurationSeconds;
+      const result = await api.client.post<X402TopupResult>(
+        '/v1/x402/manage/session/topup',
+        { addTrafficGB: args.addTrafficGB, addDurationSeconds: args.addDurationSeconds },
+        undefined,
+        { ...withToken(args.sessionToken), 'Payment-Signature': args.paymentSignature },
+      );
 
-        const result = await api.client.post<any>(
-          '/x402/manage/session/topup',
-          body,
-          {
-            'X-Session-Token': args.sessionToken,
-            'Payment-Signature': args.paymentSignature,
-          },
-        );
+      const lines = [
+        '# Session Topped Up Successfully',
+        '',
+        `**Session ID:** ${result.sessionId}`,
+        `**Traffic Allocated:** ${result.trafficAllocatedGB} GB`,
+        `**New Expiration:** ${result.expiresAt}`,
+        '',
+      ];
 
-        const lines = [
-          '# Session Topped Up Successfully',
-          '',
-          `**Session ID:** ${result.sessionId}`,
-          `**Traffic Allocated:** ${result.trafficAllocatedGB} GB`,
-          `**New Expiration:** ${result.expiresAt}`,
-          '',
-          '## Payment',
-          `- **TX Hash:** ${result.payment.txHash}`,
-          `- **Network:** ${result.payment.network}`,
-          `- **Amount:** $${result.payment.amountUSDC} USDC`,
-          '',
-        ];
-
-        if (result.ports && result.ports.length > 0) {
-          lines.push('## Updated Ports');
-          for (const port of result.ports) {
-            lines.push(`- **${port.id}** - New expiration: ${port.expiresAt}`);
-          }
-        }
-
-        return lines.join('\n');
-      } catch (error: any) {
-        return `Error topping up session: ${error.message}`;
+      if (result.payment) {
+        lines.push('## Payment');
+        lines.push(`- **TX Hash:** ${result.payment.txHash}`);
+        lines.push(`- **Network:** ${result.payment.network}`);
+        lines.push(`- **Amount:** $${result.payment.amountUSDC} USDC`);
+        lines.push('');
       }
+
+      if (result.ports && result.ports.length > 0) {
+        lines.push('## Updated Ports');
+        for (const port of result.ports) {
+          lines.push(`- **${port.id}** - New expiration: ${port.expiresAt}`);
+        }
+      }
+
+      return lines.join('\n');
     },
   };
 }

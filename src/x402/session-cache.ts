@@ -3,7 +3,7 @@
  * Local persistence for active x402 proxy sessions
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from 'fs';
 import { homedir } from 'os';
 import { join, dirname } from 'path';
 import type { CachedSession, SessionCacheData, ProxyCredentials, LocationInfo } from './types.js';
@@ -14,6 +14,17 @@ import type { CachedSession, SessionCacheData, ProxyCredentials, LocationInfo } 
 const DEFAULT_CACHE_DIR = join(homedir(), '.proxies-sx');
 const DEFAULT_CACHE_FILE = 'x402-sessions.json';
 const POOL_TOKEN_FILE = 'x402-pool-token.json';
+
+/**
+ * The cache holds proxy passwords and x402s_ session tokens, so the folder and
+ * the files are readable by the owner only. chmod covers a file an older
+ * version created with the default mode.
+ */
+function writePrivateJson(path: string, data: unknown): void {
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  writeFileSync(path, JSON.stringify(data, null, 2), { mode: 0o600 });
+  chmodSync(path, 0o600);
+}
 
 /**
  * x402 Session Cache
@@ -66,13 +77,8 @@ export class X402SessionCache {
    */
   private save(): void {
     try {
-      const dir = dirname(this.cachePath);
-      if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-      }
-
       this.cache.lastUpdated = new Date().toISOString();
-      writeFileSync(this.cachePath, JSON.stringify(this.cache, null, 2));
+      writePrivateJson(this.cachePath, this.cache);
     } catch (error) {
       console.error('Failed to save session cache:', error);
     }
@@ -308,18 +314,11 @@ export class X402SessionCache {
    */
   setPoolToken(sessionToken: string): void {
     try {
-      const dir = dirname(this.poolTokenPath);
-      if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-      }
-      writeFileSync(
-        this.poolTokenPath,
-        JSON.stringify(
-          { walletAddress: this.walletAddress, sessionToken, updatedAt: new Date().toISOString() },
-          null,
-          2
-        )
-      );
+      writePrivateJson(this.poolTokenPath, {
+        walletAddress: this.walletAddress,
+        sessionToken,
+        updatedAt: new Date().toISOString(),
+      });
     } catch (error) {
       console.error('Failed to save pool token:', error);
     }

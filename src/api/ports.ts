@@ -10,51 +10,22 @@ import type {
   PortIp,
   PingResult,
   SpeedTestResult,
+  ExtendPortResult,
+  MaxExtendHours,
   CreatePortRequest,
-  CreatePortResponse,
   UpdateCredentialsRequest,
   ReconfigurePortRequest,
-  OsFingerprintOption,
-  PaginatedResponse,
 } from './types.js';
-
-export interface ListPortsParams {
-  page?: number;
-  limit?: number;
-  type?: 'shared' | 'private';
-  status?: 'active' | 'suspended' | 'expired';
-  countryId?: string;
-  carrierId?: string;
-}
 
 export class PortsApi {
   constructor(private readonly client: ApiClient) {}
 
   /**
-   * List all ports with optional filters
+   * List the account's ports (the route takes no filters)
    * Required scope: ports:read
    */
-  async list(params?: ListPortsParams): Promise<PaginatedResponse<Port>> {
-    const result = await this.client.get<PaginatedResponse<Port> | Port[]>('/v1/ports', {
-      page: params?.page ?? 1,
-      limit: params?.limit ?? 50,
-      type: params?.type,
-      status: params?.status,
-      countryId: params?.countryId,
-      carrierId: params?.carrierId,
-    });
-
-    // Handle both plain array and paginated response formats
-    if (Array.isArray(result)) {
-      return {
-        data: result,
-        total: result.length,
-        page: 1,
-        limit: params?.limit ?? 50,
-        totalPages: 1,
-      };
-    }
-    return result;
+  async list(): Promise<Port[]> {
+    return this.client.get<Port[]>('/v1/ports');
   }
 
   /**
@@ -68,10 +39,9 @@ export class PortsApi {
   /**
    * Create new port
    * Required scope: ports:write
-   * Note: Backend may return Port directly or wrapped in { port: Port, message: string }
    */
-  async create(data: CreatePortRequest): Promise<CreatePortResponse | Port> {
-    return this.client.post<CreatePortResponse | Port>('/v1/ports', data);
+  async create(data: CreatePortRequest): Promise<Port> {
+    return this.client.post<Port>('/v1/ports', data);
   }
 
   /**
@@ -101,19 +71,11 @@ export class PortsApi {
   }
 
   /**
-   * Get available OS fingerprints
-   * Required scope: ports:read
-   */
-  async getOsFingerprints(portId: string): Promise<OsFingerprintOption[]> {
-    return this.client.get<OsFingerprintOption[]>(`/v1/ports/${portId}/os-fingerprints`);
-  }
-
-  /**
-   * Reconfigure port to new location
-   * Required scope: ports:write
+   * Reconfigure port to new location. Returns a NEW port: the old id is gone.
+   * Required scope: ports:write (3 calls per 2 minutes)
    */
   async reconfigure(portId: string, data: ReconfigurePortRequest): Promise<Port> {
-    return this.client.put<Port>(`/v1/ports/${portId}/reconfigure`, data);
+    return this.client.post<Port>(`/v1/ports/${portId}/reconfigure`, data);
   }
 
   /**
@@ -125,7 +87,7 @@ export class PortsApi {
   }
 
   /**
-   * Get current public IP of port
+   * Get the server address of a port (the exit IP is never returned)
    * Required scope: ports:read
    */
   async getIp(portId: string): Promise<PortIp> {
@@ -145,6 +107,22 @@ export class PortsApi {
    * Required scope: ports:read
    */
   async speedTest(portId: string): Promise<SpeedTestResult> {
-    return this.client.get<SpeedTestResult>(`/v1/ports/${portId}/speed-test`);
+    return this.client.get<SpeedTestResult>(`/v1/ports/${portId}/test-speed`);
+  }
+
+  /**
+   * Extend a port's expiry (time is free)
+   * Required scope: ports:write
+   */
+  async extend(portId: string, hours: number): Promise<ExtendPortResult> {
+    return this.client.post<ExtendPortResult>(`/v1/ports/${portId}/extend-time`, { hours });
+  }
+
+  /**
+   * Get how many hours a port can still be extended by
+   * Required scope: ports:read
+   */
+  async getMaxExtendHours(portId: string): Promise<MaxExtendHours> {
+    return this.client.get<MaxExtendHours>(`/v1/ports/${portId}/max-extend-hours`);
   }
 }

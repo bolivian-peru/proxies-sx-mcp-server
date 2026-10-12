@@ -1,14 +1,13 @@
 /**
  * Reference Tools
- * MCP tools for countries (dynamic availability data)
- *
- * NOTE: Cities, regions, and carriers were removed as they contain
- * static/stale data. Real device availability is fetched dynamically
- * at port creation time from the backend.
+ * MCP tools for dedicated-port availability (countries, carriers and cities
+ * that have a free carrier modem right now)
  */
 
 import { z } from 'zod';
 import type { ProxiesApi } from '../api/index.js';
+import type { NamedRef, WithFreeDevices } from '../api/index.js';
+import { readOnly } from './annotations.js';
 
 /**
  * Tool definitions for reference data
@@ -16,13 +15,14 @@ import type { ProxiesApi } from '../api/index.js';
 export const referenceToolDefinitions = [
   {
     name: 'list_available_countries',
-    description: 'List countries where proxy ports can be created (only shows countries with available devices). Returns countryId for each country - use this countryId when creating ports or querying country-specific data.',
+    annotations: readOnly('List Available Countries'),
+    description: 'List the countries where a dedicated port can be created right now, with the countryId create_port needs. Dedicated ports run on carrier modems, which exist only in US, GB, FR, NL, PL and GE (Georgia); for every other country use the Pool Gateway (pool_get_stock, pool_build_proxy_url). Pass countryId to also list the carriers and cities there with their ids. Scope ports:read.',
     inputSchema: {
       type: 'object' as const,
       properties: {
-        isPrivate: {
-          type: 'boolean',
-          description: 'Filter for private devices (true) or shared devices (false). Default: false (shared)',
+        countryId: {
+          type: 'string',
+          description: 'Optional countryId from this tool: also list carriers and cities with free devices in that country',
         },
       },
       required: [] as string[],
@@ -30,27 +30,35 @@ export const referenceToolDefinitions = [
   },
 ] as const;
 
+function formatRefs(title: string, rows: WithFreeDevices<NamedRef>[]): string[] {
+  if (rows.length === 0) return [`${title}: none with a free device`];
+  return [`${title}:`, ...rows.map(r => `  ${r.name} - ${r.freeDeviceCount} free device(s) - id: ${r._id}`)];
+}
+
 /**
  * Reference tools handler
  */
 export function createReferenceToolHandlers(api: ProxiesApi) {
   return {
-    async list_available_countries(args: { isPrivate?: boolean } = {}): Promise<string> {
+    async list_available_countries(args: { countryId?: string } = {}): Promise<string> {
       try {
-        const isPrivate = args.isPrivate ?? false;
-        const countries = await api.reference.getAvailableCountries(isPrivate);
+        const countries = await api.reference.getAvailableCountries();
 
         if (countries.length === 0) {
-          return `No countries available for ${isPrivate ? 'private' : 'shared'} ports. This means no devices have available slots.`;
+          return 'No country has a free dedicated-port device right now. The Pool Gateway may still have stock: see pool_get_stock.';
         }
 
-        const portType = isPrivate ? 'Private' : 'Shared';
-        const lines = [`Available Countries for ${portType} Ports (${countries.length}):`];
-        lines.push('');
-
+        const lines = ['Countries with a free dedicated-port device:', ''];
         for (const country of countries) {
-          const flag = country.flag || '';
-          lines.push(`${flag} ${country.name} (${country.code}) - ${country.freeDeviceCount} device(s) available - countryId: ${country._id}`);
+          lines.push(`${country.name} (${country.code}) - ${country.freeDeviceCount} free device(s) - countryId: ${country._id}`);
+        }
+
+        if (args.countryId) {
+          const [carriers, cities] = await Promise.all([
+            api.reference.getCarriers(args.countryId),
+            api.reference.getCities(args.countryId),
+          ]);
+          lines.push('', ...formatRefs('Carriers (carrierId)', carriers), '', ...formatRefs('Cities (cityId)', cities));
         }
 
         return lines.join('\n');
@@ -66,6 +74,6 @@ export function createReferenceToolHandlers(api: ProxiesApi) {
  */
 export const referenceSchemas = {
   list_available_countries: z.object({
-    isPrivate: z.boolean().optional(),
+    countryId: z.string().optional(),
   }),
 };

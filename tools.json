@@ -1,0 +1,1940 @@
+[
+  {
+    "name": "pool_get_stock",
+    "category": "Pool Gateway",
+    "title": "Pool: Get Stock",
+    "description": "Get live Pool Gateway stock, no account needed.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "public",
+    "params": [
+      {
+        "name": "country",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "pool_get_facets",
+    "category": "Pool Gateway",
+    "title": "Pool: Get Targeting Options",
+    "description": "List the cities, states, carriers (with ASN and class) and IP classes that have stock in one country, with counts, no account needed.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "public",
+    "params": [
+      {
+        "name": "country",
+        "required": true
+      },
+      {
+        "name": "pool",
+        "required": false
+      },
+      {
+        "name": "city",
+        "required": false
+      },
+      {
+        "name": "state",
+        "required": false
+      },
+      {
+        "name": "carrier",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "pool_build_proxy_url",
+    "category": "Pool Gateway",
+    "title": "Pool: Build Proxy URL",
+    "description": "Build a ready-to-use Pool Gateway proxy URL (gw.proxies.sx, HTTP 7000 or SOCKS5 7001).",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "public",
+    "params": [
+      {
+        "name": "proxyUsername",
+        "required": true
+      },
+      {
+        "name": "password",
+        "required": false
+      },
+      {
+        "name": "pakKey",
+        "required": false
+      },
+      {
+        "name": "pool",
+        "required": false
+      },
+      {
+        "name": "country",
+        "required": false
+      },
+      {
+        "name": "ipType",
+        "required": false
+      },
+      {
+        "name": "carrier",
+        "required": false
+      },
+      {
+        "name": "city",
+        "required": false
+      },
+      {
+        "name": "state",
+        "required": false
+      },
+      {
+        "name": "isp",
+        "required": false
+      },
+      {
+        "name": "asn",
+        "required": false
+      },
+      {
+        "name": "sid",
+        "required": false
+      },
+      {
+        "name": "rotation",
+        "required": false
+      },
+      {
+        "name": "strict",
+        "required": false
+      },
+      {
+        "name": "failover",
+        "required": false
+      },
+      {
+        "name": "ttl",
+        "required": false
+      },
+      {
+        "name": "protocol",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "pool_explain_error",
+    "category": "Pool Gateway",
+    "title": "Pool: Explain Gateway Error",
+    "description": "Explain a Pool Gateway error and say what to do about it.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "public",
+    "params": [
+      {
+        "name": "error",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "pool_get_my_credentials",
+    "category": "Pool Gateway",
+    "title": "Pool: Get My Credentials",
+    "description": "Get your Pool Gateway proxy username and proxy password with ready HTTP and SOCKS5 URLs.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "pool_set_proxy_password",
+    "category": "Pool Gateway",
+    "title": "Pool: Set Proxy Password",
+    "description": "Set a new proxy password (at least 6 characters).",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "proxyPassword",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "pool_get_my_stats",
+    "category": "Pool Gateway",
+    "title": "Pool: Get My Stats",
+    "description": "Get your own Pool Gateway traffic and open connections, plus the health score of the pool and how many devices are connected to it.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "pool_list_sessions",
+    "category": "Pool Gateway",
+    "title": "Pool: List Sessions",
+    "description": "List your saved Pool Gateway sessions: pool, country, carrier, rotation mode, bytes and last activity.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "pakId",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "pool_close_session",
+    "category": "Pool Gateway",
+    "title": "Pool: Close Session",
+    "description": "Close one Pool Gateway session by the sessionKey from pool_list_sessions.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "sessionKey",
+        "required": true
+      },
+      {
+        "name": "pakId",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "pool_close_all_sessions",
+    "category": "Pool Gateway",
+    "title": "Pool: Close All Sessions",
+    "description": "Close every saved Pool Gateway session of the account.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "pakId",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "private_pool_list",
+    "category": "Private Pool and Reserved IPs",
+    "title": "Private Pool: List",
+    "description": "List your Private Pools with their countries, status, gateway username, connection strings with the password masked (private_pool_reveal shows the key) and remaining GB.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "private_pool_build",
+    "category": "Private Pool and Reserved IPs",
+    "title": "Private Pool: Build",
+    "description": "Create a Private Pool paid from the account's existing GB balance: no purchase, traffic is metered from the same balance.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "countries",
+        "required": true
+      },
+      {
+        "name": "deviceCount",
+        "required": false
+      },
+      {
+        "name": "dedicateGB",
+        "required": false
+      },
+      {
+        "name": "qualityTier",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "private_pool_reveal",
+    "category": "Private Pool and Reserved IPs",
+    "title": "Private Pool: Reveal Password",
+    "description": "Show the gateway password (pak_ key) of a Private Pool.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "poolId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "private_pool_usage",
+    "category": "Private Pool and Reserved IPs",
+    "title": "Private Pool: Usage",
+    "description": "Get the traffic of a Private Pool per day, in MB.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "poolId",
+        "required": true
+      },
+      {
+        "name": "days",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "reserved_ip_list",
+    "category": "Private Pool and Reserved IPs",
+    "title": "Reserved IP: List",
+    "description": "List the Reserved IPs a Private Pool holds: country, class, carrier, city, rotation mode, whether the device is online, the exit IP last seen, and connection strings with the password masked.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "poolId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "reserved_ip_reserve",
+    "category": "Private Pool and Reserved IPs",
+    "title": "Reserved IP: Reserve",
+    "description": "Reserve one device for a Private Pool so no other customer is routed through it, and get its connection strings with the password masked.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "poolId",
+        "required": true
+      },
+      {
+        "name": "country",
+        "required": true
+      },
+      {
+        "name": "ipType",
+        "required": false
+      },
+      {
+        "name": "source",
+        "required": false
+      },
+      {
+        "name": "carrier",
+        "required": false
+      },
+      {
+        "name": "asn",
+        "required": false
+      },
+      {
+        "name": "city",
+        "required": false
+      },
+      {
+        "name": "state",
+        "required": false
+      },
+      {
+        "name": "failover",
+        "required": false
+      },
+      {
+        "name": "idleTtlSec",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "reserved_ip_rotate",
+    "category": "Private Pool and Reserved IPs",
+    "title": "Reserved IP: Rotate",
+    "description": "Move a Reserved IP to a different device in the same country now.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "leaseId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "reserved_ip_extend",
+    "category": "Private Pool and Reserved IPs",
+    "title": "Reserved IP: Set Idle Window",
+    "description": "Change how long a Reserved IP is kept without traffic.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "leaseId",
+        "required": true
+      },
+      {
+        "name": "idleTtlSec",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "reserved_ip_set_rotation",
+    "category": "Private Pool and Reserved IPs",
+    "title": "Reserved IP: Set Rotation",
+    "description": "Set whether a Reserved IP moves to another device on a schedule: off (hold the device, the default) or every 5, 10, 20 or 60 minutes.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "leaseId",
+        "required": true
+      },
+      {
+        "name": "mode",
+        "required": true
+      },
+      {
+        "name": "failover",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "reserved_ip_release",
+    "category": "Private Pool and Reserved IPs",
+    "title": "Reserved IP: Release",
+    "description": "Give a Reserved IP back to the shared pool.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "leaseId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_account_summary",
+    "category": "Account",
+    "title": "Get Account Summary",
+    "description": "Get the account balance, free port slots, traffic bought and left, and any account alerts.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "get_account_usage",
+    "category": "Account",
+    "title": "Get Account Usage",
+    "description": "Get traffic purchased, used and still available, split into Pool Gateway traffic and dedicated-port traffic.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "get_pricing",
+    "category": "Billing",
+    "title": "Get Pricing",
+    "description": "Get the live price per GB, the volume discounts, the free port-slot tiers and your current tier.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "calculate_price",
+    "category": "Billing",
+    "title": "Calculate Price",
+    "description": "Calculate what a GB amount costs with the volume discount applied.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "amount",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "purchase_shared_traffic",
+    "category": "Billing",
+    "title": "Purchase Traffic",
+    "description": "Buy traffic in GB from the account balance.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "quantityGB",
+        "required": true
+      },
+      {
+        "name": "couponCode",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "coupon_validate",
+    "category": "Billing",
+    "title": "Validate Coupon",
+    "description": "Check whether a coupon code is valid for an order, without using it.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "code",
+        "required": true
+      },
+      {
+        "name": "orderAmount",
+        "required": true
+      },
+      {
+        "name": "orderType",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "coupon_redeem",
+    "category": "Billing",
+    "title": "Redeem Coupon",
+    "description": "Redeem a standalone coupon that grants free GB or port slots to the account.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "code",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_payment_history",
+    "category": "Billing",
+    "title": "Get Payment History",
+    "description": "List the account's past payments and crypto top-up orders.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "create_crypto_payment",
+    "category": "Crypto payments",
+    "title": "Create Crypto Payment",
+    "description": "Create a crypto order that tops up the account balance and return its hosted payment link.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "amount",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "check_crypto_payment_status",
+    "category": "Crypto payments",
+    "title": "Check Crypto Payment Status",
+    "description": "Check whether a crypto order is still unpaid, confirming, paid, expired or cancelled, and whether the balance was credited.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "orderId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_pending_crypto_payments",
+    "category": "Crypto payments",
+    "title": "Get Pending Crypto Payments",
+    "description": "List the account's crypto orders that are not finished yet, with their payment links.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "cancel_crypto_payment",
+    "category": "Crypto payments",
+    "title": "Cancel Crypto Payment",
+    "description": "Cancel a crypto order that has not been paid yet.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "orderId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_crypto_payment_info",
+    "category": "Crypto payments",
+    "title": "Get Crypto Payment Info",
+    "description": "Check whether crypto top-ups are available right now and which currencies the payment page accepts.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "list_available_countries",
+    "category": "Dedicated ports",
+    "title": "List Available Countries",
+    "description": "List the countries where a dedicated port can be created right now, with the countryId create_port needs.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "countryId",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "list_ports",
+    "category": "Dedicated ports",
+    "title": "List Ports",
+    "description": "List your dedicated ports with status, country, carrier, expiry and port ids.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "status",
+        "required": false
+      },
+      {
+        "name": "limit",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "get_port",
+    "category": "Dedicated ports",
+    "title": "Get Port",
+    "description": "Get one dedicated port with its location and ready-to-use HTTP and SOCKS5 connection strings (contains the port password).",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "create_port",
+    "category": "Dedicated ports",
+    "title": "Create Port",
+    "description": "Create a dedicated port on a carrier modem and return its connection strings.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "countryId",
+        "required": true
+      },
+      {
+        "name": "carrierId",
+        "required": false
+      },
+      {
+        "name": "cityId",
+        "required": false
+      },
+      {
+        "name": "expiresInDays",
+        "required": false
+      },
+      {
+        "name": "osFingerprint",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "delete_port",
+    "category": "Dedicated ports",
+    "title": "Delete Port",
+    "description": "Delete a dedicated port and free its slot.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "update_port_credentials",
+    "category": "Dedicated ports",
+    "title": "Update Port Credentials",
+    "description": "Change the login and/or password of a dedicated port.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      },
+      {
+        "name": "proxyLogin",
+        "required": false
+      },
+      {
+        "name": "proxyPassword",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "update_os_fingerprint",
+    "category": "Dedicated ports",
+    "title": "Update OS Fingerprint",
+    "description": "Set the OS fingerprint (TCP/IP signature) a dedicated port presents.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      },
+      {
+        "name": "osFingerprint",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "reconfigure_port",
+    "category": "Dedicated ports",
+    "title": "Reconfigure Port",
+    "description": "Move a dedicated port to another country, carrier or city.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      },
+      {
+        "name": "countryId",
+        "required": true
+      },
+      {
+        "name": "carrierId",
+        "required": false
+      },
+      {
+        "name": "cityId",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "extend_port",
+    "category": "Dedicated ports",
+    "title": "Extend Port",
+    "description": "Add hours to a dedicated port's expiry.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      },
+      {
+        "name": "hours",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_port_status",
+    "category": "Port status",
+    "title": "Get Port Status",
+    "description": "Check whether a dedicated port is online, offline or expired.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_port_ip",
+    "category": "Port status",
+    "title": "Get Port Server Address",
+    "description": "Get the server address a dedicated port listens on.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "ping_port",
+    "category": "Port status",
+    "title": "Ping Port",
+    "description": "Test that a dedicated port answers and measure its latency.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "speed_test_port",
+    "category": "Port status",
+    "title": "Speed Test Port",
+    "description": "Run a speed test through a dedicated port (download, upload, ping).",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "rotate_port",
+    "category": "Port rotation",
+    "title": "Rotate Port",
+    "description": "Move a dedicated port to another modem in the same location.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "check_rotation_availability",
+    "category": "Port rotation",
+    "title": "Check Rotation Availability",
+    "description": "Check whether a dedicated port can be rotated now, how long the cooldown still runs and how many other modems are free.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "configure_auto_rotation",
+    "category": "Port rotation",
+    "title": "Configure Auto Rotation",
+    "description": "Turn automatic rotation of a dedicated port on or off and set its interval.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      },
+      {
+        "name": "enabled",
+        "required": true
+      },
+      {
+        "name": "intervalMinutes",
+        "required": false
+      },
+      {
+        "name": "matchCarrier",
+        "required": false
+      },
+      {
+        "name": "matchCity",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "get_rotation_history",
+    "category": "Port rotation",
+    "title": "Get Rotation History",
+    "description": "Get the past rotations of a dedicated port: when, how triggered, the location it moved to and whether it worked.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      },
+      {
+        "name": "limit",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "get_rotation_token_url",
+    "category": "Port rotation",
+    "title": "Get Rotation Token URL",
+    "description": "Get the public rotation link of a dedicated port.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_proxy_connection_string",
+    "category": "Utilities",
+    "title": "Get Proxy Connection String",
+    "description": "Build the HTTP or SOCKS5 connection string of a dedicated port (contains the port password).",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      },
+      {
+        "name": "protocol",
+        "required": false
+      },
+      {
+        "name": "serverHost",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "get_all_proxy_formats",
+    "category": "Utilities",
+    "title": "Get All Proxy Formats",
+    "description": "Get a dedicated port in every common format: URLs, host:port, environment variables, curl, Python and Node.js snippets, and its public rotation link.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "portId",
+        "required": true
+      },
+      {
+        "name": "serverHost",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "get_service_status",
+    "category": "Utilities",
+    "title": "Get Service Status",
+    "description": "Check whether Proxies.sx is healthy right now: open Pool Gateway incidents, the state of the API, gateway and relay, and recent uptime.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "public",
+    "params": []
+  },
+  {
+    "name": "get_os_fingerprint_options",
+    "category": "Utilities",
+    "title": "Get OS Fingerprint Options",
+    "description": "List the OS fingerprint values create_port and update_os_fingerprint accept.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "create_support_ticket",
+    "category": "Support",
+    "title": "Create Support Ticket",
+    "description": "Open a support ticket that a person at Proxies.sx reads and answers.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "subject",
+        "required": true
+      },
+      {
+        "name": "message",
+        "required": true
+      },
+      {
+        "name": "category",
+        "required": false
+      },
+      {
+        "name": "priority",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "list_my_tickets",
+    "category": "Support",
+    "title": "List My Tickets",
+    "description": "List your support tickets with their status and IDs.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "get_ticket",
+    "category": "Support",
+    "title": "Get Ticket",
+    "description": "Get one support ticket with the original message and every reply.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "ticketId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "reply_to_ticket",
+    "category": "Support",
+    "title": "Reply to Ticket",
+    "description": "Add a reply to one of your support tickets.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "ticketId",
+        "required": true
+      },
+      {
+        "name": "message",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "close_ticket",
+    "category": "Support",
+    "title": "Close Ticket",
+    "description": "Close one of your support tickets once the problem is solved.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "ticketId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "pool_mint_key",
+    "category": "Pool access keys (reseller accounts)",
+    "title": "Pool: Mint Access Key",
+    "description": "Create a Pool Access Key (pak_) for one of your customers; it is used as the proxy password.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "label",
+        "required": true
+      },
+      {
+        "name": "trafficCapGB",
+        "required": false
+      },
+      {
+        "name": "expiresAt",
+        "required": false
+      },
+      {
+        "name": "qualityTier",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "pool_list_keys",
+    "category": "Pool access keys (reseller accounts)",
+    "title": "Pool: List Access Keys",
+    "description": "List your Pool Access Keys with usage, cap and expiry; the key values are masked.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": []
+  },
+  {
+    "name": "pool_topup_key",
+    "category": "Pool access keys (reseller accounts)",
+    "title": "Pool: Top Up Access Key",
+    "description": "Add GB to a Pool Access Key's cap and/or extend its expiry in one step.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "keyId",
+        "required": true
+      },
+      {
+        "name": "addTrafficGB",
+        "required": false
+      },
+      {
+        "name": "extendDays",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "pool_update_key",
+    "category": "Pool access keys (reseller accounts)",
+    "title": "Pool: Update Access Key",
+    "description": "Change a Pool Access Key's label, enabled flag, cap, expiry or quality tier.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "keyId",
+        "required": true
+      },
+      {
+        "name": "label",
+        "required": false
+      },
+      {
+        "name": "enabled",
+        "required": false
+      },
+      {
+        "name": "trafficCapGB",
+        "required": false
+      },
+      {
+        "name": "expiresAt",
+        "required": false
+      },
+      {
+        "name": "qualityTier",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "pool_regenerate_key",
+    "category": "Pool access keys (reseller accounts)",
+    "title": "Pool: Regenerate Access Key",
+    "description": "Replace the secret pak_ value of a Pool Access Key.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "keyId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "pool_reveal_key",
+    "category": "Pool access keys (reseller accounts)",
+    "title": "Pool: Reveal Access Key",
+    "description": "Show the full pak_ value of a Pool Access Key.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "keyId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "pool_delete_key",
+    "category": "Pool access keys (reseller accounts)",
+    "title": "Pool: Delete Access Key",
+    "description": "Delete a Pool Access Key.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "keyId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "pool_key_usage",
+    "category": "Pool access keys (reseller accounts)",
+    "title": "Pool: Access Key Usage",
+    "description": "Get the traffic of one Pool Access Key per day, in MB.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "keyId",
+        "required": true
+      },
+      {
+        "name": "days",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "pool_key_audit",
+    "category": "Pool access keys (reseller accounts)",
+    "title": "Pool: Access Key Audit Log",
+    "description": "Get the audit log of one Pool Access Key, newest first: created, changed, topped up, regenerated, revealed, deleted, and gateway logins that worked or failed.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "keyId",
+        "required": true
+      },
+      {
+        "name": "limit",
+        "required": false
+      },
+      {
+        "name": "before",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "get_x402_session",
+    "category": "x402 session management",
+    "title": "Get x402 Session",
+    "description": "Get details of your x402 session including all ports.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "sessionToken",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "list_x402_ports",
+    "category": "x402 session management",
+    "title": "List x402 Ports",
+    "description": "List all ports in your x402 session with connection strings and expiration times",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "sessionToken",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_x402_port_status",
+    "category": "x402 session management",
+    "title": "Get x402 Port Status",
+    "description": "Get detailed status of a specific port including traffic usage and connection info",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "sessionToken",
+        "required": true
+      },
+      {
+        "name": "portId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_sessions_by_wallet",
+    "category": "x402 session management",
+    "title": "Get Sessions by Wallet",
+    "description": "List all x402 sessions associated with your wallet address.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "walletAddress",
+        "required": true
+      },
+      {
+        "name": "status",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "get_session_status",
+    "category": "x402 session management",
+    "title": "Get Session Status",
+    "description": "Get quick status check for a session including traffic usage and expiration",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "sessionId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "replace_x402_port",
+    "category": "x402 session management",
+    "title": "Replace x402 Port",
+    "description": "Replace an offline port of an x402 session with a new port on another device, at no charge.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "sessionToken",
+        "required": true
+      },
+      {
+        "name": "portId",
+        "required": false
+      },
+      {
+        "name": "country",
+        "required": false
+      },
+      {
+        "name": "city",
+        "required": false
+      },
+      {
+        "name": "carrier",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "calculate_x402_topup",
+    "category": "x402 session management",
+    "title": "Calculate x402 Top-up",
+    "description": "Calculate what it costs to add traffic and/or time to an x402 session.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "sessionToken",
+        "required": true
+      },
+      {
+        "name": "addTrafficGB",
+        "required": false
+      },
+      {
+        "name": "addDurationSeconds",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "topup_x402_session",
+    "category": "x402 session management",
+    "title": "Top Up x402 Session",
+    "description": "Add traffic and/or time to an x402 session.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "sessionToken",
+        "required": true
+      },
+      {
+        "name": "paymentSignature",
+        "required": true
+      },
+      {
+        "name": "addTrafficGB",
+        "required": false
+      },
+      {
+        "name": "addDurationSeconds",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "ops_get_user",
+    "category": "Ops (admin keys only)",
+    "title": "Ops: Get User",
+    "description": "Customer 360 view: balance, pool-gateway usage, ports, and (if a farmer) their AI note.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "userId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "ops_get_user_audit",
+    "category": "Ops (admin keys only)",
+    "title": "Ops: Get User Audit",
+    "description": "Recent ops-agent actions taken on this user.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "userId",
+        "required": true
+      },
+      {
+        "name": "limit",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "ops_reconcile_payments",
+    "category": "Ops (admin keys only)",
+    "title": "Ops: Reconcile Payments",
+    "description": "Read-only Stripe-vs-DB payment view for a user (confirmed total + pending).",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "userId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "ops_list_tickets",
+    "category": "Ops (admin keys only)",
+    "title": "Ops: List Tickets",
+    "description": "List support tickets (admin view).",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "status",
+        "required": false
+      },
+      {
+        "name": "limit",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "ops_reply_ticket",
+    "category": "Ops (admin keys only)",
+    "title": "Ops: Reply to Ticket",
+    "description": "Post an admin reply to a ticket, optionally emailing the customer.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "ticketId",
+        "required": true
+      },
+      {
+        "name": "message",
+        "required": true
+      },
+      {
+        "name": "sendEmail",
+        "required": false
+      },
+      {
+        "name": "reason",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "ops_set_slots",
+    "category": "Ops (admin keys only)",
+    "title": "Ops: Set Port Slots",
+    "description": "Set a user's port slot limit (capped).",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "userId",
+        "required": true
+      },
+      {
+        "name": "sharedSlotLimit",
+        "required": false
+      },
+      {
+        "name": "privateSlotLimit",
+        "required": false
+      },
+      {
+        "name": "reason",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "ops_credit_balance",
+    "category": "Ops (admin keys only)",
+    "title": "Ops: Credit Balance",
+    "description": "Credit a user's balance in USD (admin credit).",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "userId",
+        "required": true
+      },
+      {
+        "name": "amountUsd",
+        "required": true
+      },
+      {
+        "name": "reason",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "ops_email_user",
+    "category": "Ops (admin keys only)",
+    "title": "Ops: Email User",
+    "description": "Send a personalized email to one user (hourly rate-capped).",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "userId",
+        "required": true
+      },
+      {
+        "name": "subject",
+        "required": true
+      },
+      {
+        "name": "content",
+        "required": true
+      },
+      {
+        "name": "reason",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "ops_list_farmers",
+    "category": "Ops (admin keys only)",
+    "title": "Ops: List Farmers",
+    "description": "List farmer AI notes (shared operational memory).",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "limit",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "ops_get_farmer",
+    "category": "Ops (admin keys only)",
+    "title": "Ops: Get Farmer",
+    "description": "Farmer fleet funnel (total/online/verified/listed/routable) + AI note.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "farmerId",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "ops_write_farmer_note",
+    "category": "Ops (admin keys only)",
+    "title": "Ops: Write Farmer Note",
+    "description": "Write/append a farmer AI note (situation, nextAction, free note) — shared with future AI sessions.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "apiKey",
+    "params": [
+      {
+        "name": "farmerId",
+        "required": true
+      },
+      {
+        "name": "situation",
+        "required": false
+      },
+      {
+        "name": "nextAction",
+        "required": false
+      },
+      {
+        "name": "note",
+        "required": false
+      },
+      {
+        "name": "reason",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "x402_get_proxy",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Buy Proxy",
+    "description": "Buy a dedicated mobile proxy on one carrier modem by paying USDC from the agent wallet; no account needed.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "x402",
+    "params": [
+      {
+        "name": "country",
+        "required": true
+      },
+      {
+        "name": "duration_hours",
+        "required": false
+      },
+      {
+        "name": "traffic_gb",
+        "required": false
+      },
+      {
+        "name": "city",
+        "required": false
+      },
+      {
+        "name": "carrier",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "x402_get_pricing",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Get Pricing",
+    "description": "Get the live x402 price per GB, the smallest purchase, the allowed duration and the payment networks, and compare the cost of a purchase with the wallet balance.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "x402",
+    "params": [
+      {
+        "name": "traffic_gb",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "x402_list_sessions",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: List Sessions",
+    "description": "List the active x402 proxy sessions this wallet bought from this machine, with location, expiry and proxy host.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "x402",
+    "params": []
+  },
+  {
+    "name": "x402_check_session",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Check Session",
+    "description": "Get status, time left, traffic used and the connection strings of an x402 proxy session.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "x402",
+    "params": [
+      {
+        "name": "session_id",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "x402_wallet_balance",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Wallet Balance",
+    "description": "Get the agent wallet address and its USDC and ETH (gas) balance on the Base network.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "x402",
+    "params": []
+  },
+  {
+    "name": "x402_rotate_ip",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Rotate Proxy",
+    "description": "Move an x402 proxy to another modem so it gets a different exit IP.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "x402",
+    "params": [
+      {
+        "name": "session_id",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "x402_list_countries",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: List Countries",
+    "description": "List the countries where x402_get_proxy can create a proxy right now, with the number of free modems.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "x402",
+    "params": []
+  },
+  {
+    "name": "x402_extend_session",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Extend Session",
+    "description": "Add hours to an x402 proxy session.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "x402",
+    "params": [
+      {
+        "name": "session_id",
+        "required": false
+      },
+      {
+        "name": "additional_hours",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "x402_service_status",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Service Status",
+    "description": "Check that the x402 payment service is up, and show the wallet balance and how many sessions are active or about to expire.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "x402",
+    "params": []
+  },
+  {
+    "name": "x402_get_pool_access",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Buy Pool Access",
+    "description": "Buy Pool Gateway traffic by paying USDC from the agent wallet; no account needed.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "x402",
+    "params": [
+      {
+        "name": "tier",
+        "required": false
+      },
+      {
+        "name": "country",
+        "required": false
+      },
+      {
+        "name": "traffic_gb",
+        "required": false
+      },
+      {
+        "name": "sid",
+        "required": false
+      },
+      {
+        "name": "rot",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "x402_pool_credit",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Pool Credit",
+    "description": "Get the GB bought, used and left on an x402 pool session.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "x402",
+    "params": [
+      {
+        "name": "session_token",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "x402_pool_topup",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Top Up Pool",
+    "description": "Add GB and/or time to an x402 pool session.",
+    "readOnly": false,
+    "destructive": false,
+    "mode": "x402",
+    "params": [
+      {
+        "name": "session_token",
+        "required": false
+      },
+      {
+        "name": "add_traffic_gb",
+        "required": false
+      },
+      {
+        "name": "add_duration_seconds",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "x402_pool_regenerate",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Regenerate Pool Password",
+    "description": "Replace the password of an x402 pool credential, for example after a leak.",
+    "readOnly": false,
+    "destructive": true,
+    "mode": "x402",
+    "params": [
+      {
+        "name": "session_token",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "x402_pool_connection",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Pool Connection",
+    "description": "Show the gateway host, port, username and password of an x402 pool session again.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "x402",
+    "params": [
+      {
+        "name": "session_token",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "x402_pool_usage",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Pool Usage",
+    "description": "Get the traffic of an x402 pool session per day, in MB.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "x402",
+    "params": [
+      {
+        "name": "session_token",
+        "required": false
+      },
+      {
+        "name": "days",
+        "required": false
+      }
+    ]
+  },
+  {
+    "name": "x402_pool_pricing",
+    "category": "x402 wallet (optional, no account)",
+    "title": "x402: Pool Pricing",
+    "description": "Get the Pool Gateway tiers that can be bought with x402 and their live price per GB and smallest purchase.",
+    "readOnly": true,
+    "destructive": false,
+    "mode": "x402",
+    "params": []
+  }
+]

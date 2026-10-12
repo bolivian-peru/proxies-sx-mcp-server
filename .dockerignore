@@ -1,0 +1,14 @@
+node_modules
+dist
+tests
+recipes
+scripts
+coverage
+.git
+.env
+.env.*
+.mcp.json
+*.log
+*.tgz
+*.tsbuildinfo
+.DS_Store

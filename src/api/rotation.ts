@@ -6,21 +6,21 @@
 import type { ApiClient } from './client.js';
 import type {
   Port,
-  RotationHistoryEntry,
+  RotateResult,
+  RotationHistory,
   CanRotateResponse,
   UpdateRotationSettingsRequest,
-  PaginatedResponse,
 } from './types.js';
 
 export class RotationApi {
   constructor(private readonly client: ApiClient) {}
 
   /**
-   * Rotate port to new device
+   * Move a port to another device
    * Required scope: ports:rotate
    */
-  async rotate(portId: string): Promise<Port> {
-    return this.client.post<Port>(`/v1/ports/${portId}/rotate`);
+  async rotate(portId: string): Promise<RotateResult> {
+    return this.client.post<RotateResult>(`/v1/ports/${portId}/rotate`);
   }
 
   /**
@@ -36,55 +36,22 @@ export class RotationApi {
    * Required scope: ports:write
    */
   async updateSettings(portId: string, settings: UpdateRotationSettingsRequest): Promise<Port> {
-    return this.client.put<Port>(`/v1/ports/${portId}/rotation-settings`, settings);
+    return this.client.patch<Port>(`/v1/ports/${portId}/rotation-settings`, settings);
   }
 
   /**
    * Get rotation history for port
    * Required scope: ports:read
    */
-  async getHistory(portId: string, params?: {
-    limit?: number;
-    offset?: number;
-  }): Promise<PaginatedResponse<RotationHistoryEntry>> {
-    return this.client.get<PaginatedResponse<RotationHistoryEntry>>(`/v1/ports/${portId}/rotation-history`, {
-      limit: params?.limit ?? 20,
-      offset: params?.offset ?? 0,
-    });
+  async getHistory(portId: string, limit: number): Promise<RotationHistory> {
+    return this.client.get<RotationHistory>(`/v1/ports/${portId}/rotation-history`, { limit });
   }
 
   /**
-   * Enable auto-rotation
-   * Required scope: ports:write
-   * @param portId - Port ID
-   * @param intervalMinutes - Rotation interval in minutes (user-friendly input)
-   */
-  async enableAutoRotation(portId: string, intervalMinutes: number, options?: {
-    matchCarrier?: boolean;
-    matchCity?: boolean;
-  }): Promise<Port> {
-    // Convert minutes to seconds for the backend
-    const intervalSeconds = intervalMinutes * 60;
-    return this.updateSettings(portId, {
-      enabled: true,
-      intervalSeconds,
-      matchCarrier: options?.matchCarrier,
-      matchCity: options?.matchCity,
-    });
-  }
-
-  /**
-   * Disable auto-rotation
-   * Required scope: ports:write
-   */
-  async disableAutoRotation(portId: string): Promise<Port> {
-    return this.updateSettings(portId, { enabled: false });
-  }
-
-  /**
-   * Get rotation token URL for public rotation API
+   * Public rotation link of a port: GET it without authentication to rotate.
+   * The only place this URL is built.
    */
   getRotationTokenUrl(baseUrl: string, rotationToken: string): string {
-    return `${baseUrl.replace(/\/$/, '')}/rotate/${rotationToken}`;
+    return `${baseUrl.replace(/\/$/, '')}/v1/rotate/${rotationToken}`;
   }
 }

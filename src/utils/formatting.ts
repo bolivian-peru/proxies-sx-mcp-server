@@ -3,20 +3,7 @@
  * Helper functions for formatting output
  */
 
-import type { Port, AccountSummary, Tariff, RotationHistoryEntry } from '../api/types.js';
-
-/**
- * Format bytes to human readable string
- */
-export function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  const value = bytes / Math.pow(1024, i);
-
-  return `${value.toFixed(2)} ${units[i]}`;
-}
+import type { Port, AccountSummary, RotationHistoryEntry } from '../api/types.js';
 
 /**
  * Format GB to human readable string
@@ -76,54 +63,60 @@ export function buildProxyConnectionString(
 }
 
 /**
+ * Both ready-to-use connection strings of a port
+ */
+export function formatPortConnection(port: Port): string {
+  return [
+    'Connection Strings (ready to use):',
+    `  HTTP:   ${buildProxyConnectionString(port, port.serverIp, 'http')}`,
+    `  SOCKS5: ${buildProxyConnectionString(port, port.serverIp, 'socks5')}`,
+  ].join('\n');
+}
+
+/**
+ * Location of the device behind a port
+ */
+function portLocation(port: Port) {
+  const device = port.device ?? (typeof port.deviceId === 'object' ? port.deviceId : undefined);
+  return {
+    country: device?.country?.name,
+    carrier: device?.carrier?.name,
+    city: device?.city?.name,
+  };
+}
+
+/**
  * Format port summary
  */
 export function formatPortSummary(port: Port): string {
-  // Get location info from port or populated device
-  let countryName = port.countryName;
-  let carrierName = port.carrierName;
-  let cityName = port.cityName;
-
-  // If device is populated, extract location from it
-  if (port.device) {
-    countryName = countryName || port.device.countryId?.name;
-    carrierName = carrierName || port.device.carrierId?.name;
-    cityName = cityName || port.device.cityId?.name;
-  }
+  const { country, carrier, city } = portLocation(port);
 
   const lines = [
     `Port: ${port.displayName || port.name}`,
     `ID: ${port._id}`,
-    `Type: ${port.slotType}`,
     `Status: ${port.status}${port.suspended ? ' (suspended)' : ''}`,
   ];
 
-  if (countryName) {
-    lines.push(`Country: ${countryName}`);
+  if (country) {
+    lines.push(`Country: ${country}`);
   }
-  if (carrierName) {
-    lines.push(`Carrier: ${carrierName}`);
+  if (carrier) {
+    lines.push(`Carrier: ${carrier}`);
   }
-  if (cityName) {
-    lines.push(`City: ${cityName}`);
+  if (city) {
+    lines.push(`City: ${city}`);
   }
 
   lines.push(`HTTP Port: ${port.httpPort}`);
   lines.push(`SOCKS5 Port: ${port.socksPort}`);
   lines.push(`Server: ${port.serverIp}`);
+  lines.push(`Port Expires: ${formatRelativeTime(new Date(port.expiresAt))}`);
 
-  // Format expiration - expiresAt is Unix timestamp (slot expiry)
-  const expiresDate = new Date(port.expiresAt);
-  lines.push(`Slot Expires: ${formatRelativeTime(expiresDate)}`);
-
-  // Note: Session duration (how long each connection stays alive) is controlled by the
-  // proxy server settings, typically via auto-rotation interval. If auto-rotation is disabled,
-  // sessions persist until the slot expires or the device reconnects.
   if (port.rotationSettings?.enabled) {
     const intervalMinutes = Math.round(port.rotationSettings.intervalSeconds / 60);
-    lines.push(`Session Duration: ~${intervalMinutes} min (auto-rotation enabled)`);
+    lines.push(`Auto-rotation: every ~${intervalMinutes} min`);
   } else {
-    lines.push(`Session Duration: Persistent (manual rotation only)`);
+    lines.push('Auto-rotation: off (the port stays on its device until you rotate it)');
   }
 
   return lines.join('\n');
@@ -140,101 +133,56 @@ export function formatAccountSummary(account: AccountSummary): string {
   if (account.shared) {
     const s = account.shared;
     lines.push('');
-    lines.push('Shared Resources:');
-    lines.push(`  Slots: ${s.slots.used}/${s.slots.total} (${s.slots.available} available)`);
+    lines.push('Resources:');
+    lines.push(`  Port slots: ${s.slots.used}/${s.slots.total} (${s.slots.available} available)`);
     lines.push(`  Traffic: ${formatGB(s.trafficGB.used)}/${formatGB(s.trafficGB.total)} (${formatGB(s.trafficGB.available)} available)`);
-    if (s.daysRemaining !== undefined) {
+    if (s.daysRemaining != null) {
       lines.push(`  Expires: ${s.daysRemaining} days remaining`);
-    }
-  }
-
-  if (account.private) {
-    const p = account.private;
-    lines.push('');
-    lines.push('Private Resources:');
-    lines.push(`  Slots: ${p.slots.used}/${p.slots.total} (${p.slots.available} available)`);
-    lines.push(`  Traffic: ${formatGB(p.trafficGB.used)}/${formatGB(p.trafficGB.total)} (${formatGB(p.trafficGB.available)} available)`);
-    if (p.daysRemaining !== undefined) {
-      lines.push(`  Expires: ${p.daysRemaining} days remaining`);
     }
   }
 
   if (account.alerts && account.alerts.length > 0) {
     lines.push('');
     lines.push('Alerts:');
-    account.alerts.forEach(a => lines.push(`  - ${a}`));
+    account.alerts.forEach(a => lines.push(`  - [${a.severity}] ${a.message}`));
   }
 
   return lines.join('\n');
 }
 
 /**
- * Format tariff info
- */
-export function formatTariff(tariff: Tariff): string {
-  // Get quantity range based on tariff type
-  let quantityRange = '';
-  if (tariff.resourceType === 'ports' && tariff.portRange) {
-    const min = tariff.portRange.min || 1;
-    const max = tariff.portRange.max;
-    quantityRange = max ? `${min}-${max}` : `${min}+`;
-  } else if (tariff.resourceType === 'traffic' && tariff.trafficRange) {
-    const min = tariff.trafficRange.min || 1;
-    const max = tariff.trafficRange.max;
-    quantityRange = max ? `${min}-${max}` : `${min}+`;
-  }
-
-  const unit = tariff.unitType === 'gb' ? 'GB' : 'slot';
-  const rangeStr = quantityRange ? ` (${quantityRange} ${unit}s)` : '';
-
-  return `${tariff.displayName}: ${formatCurrency(tariff.pricePerUnit)}/${unit}${rangeStr}`;
-}
-
-/**
  * Format rotation history entry
  */
 export function formatRotationEntry(entry: RotationHistoryEntry): string {
-  const status = entry.success ? 'Success' : `Failed: ${entry.errorMessage}`;
-  const trigger = entry.trigger.charAt(0).toUpperCase() + entry.trigger.slice(1);
+  const status = entry.success ? 'success' : `failed: ${entry.errorMessage || 'unknown reason'}`;
+  const where = [entry.country, entry.carrier, entry.city].filter(Boolean).join(' / ') || 'location not recorded';
+  const took = entry.rotationDurationMs != null ? `, ${entry.rotationDurationMs} ms` : '';
 
-  return `[${formatDate(entry.rotatedAt)}] ${trigger}: ${entry.previousDeviceName || 'Unknown'} → ${entry.newDeviceName || 'Unknown'} (${status})`;
+  return `[${formatDate(entry.createdAt)}] ${entry.triggerType}: now on ${where} (${status}${took})`;
 }
 
 /**
  * Format port list as table
- * NOTE: Port expiration (expiresAt) is the slot expiry - when the port stops working.
- * Session duration is a separate concept - how long each proxy connection stays alive.
  */
 export function formatPortTable(ports: Port[]): string {
   if (ports.length === 0) {
     return 'No ports found.';
   }
 
-  const headers = ['Name', 'Type', 'Status', 'Country', 'Slot Expires', 'Session'];
+  const headers = ['Name', 'Status', 'Country', 'Carrier', 'Expires', 'Auto-rotation'];
   const rows = ports.map(p => {
-    // Get location info from port or populated device
-    let countryName = p.countryName;
-
-    if (p.device) {
-      countryName = countryName || p.device.countryId?.name;
-    }
-
-    const expiresDate = new Date(p.expiresAt);
-
-    // Session duration based on rotation settings
-    let sessionInfo = 'Persistent';
-    if (p.rotationSettings?.enabled && p.rotationSettings.intervalSeconds) {
-      const mins = Math.round(p.rotationSettings.intervalSeconds / 60);
-      sessionInfo = `${mins}m auto`;
-    }
+    const { country, carrier } = portLocation(p);
+    const rotation = p.rotationSettings?.enabled && p.rotationSettings.intervalSeconds
+      ? `${Math.round(p.rotationSettings.intervalSeconds / 60)}m`
+      : 'off';
 
     return [
       p.displayName || p.name,
-      p.slotType,
       p.status + (p.suspended ? ' (sus)' : ''),
-      countryName || '-',
-      formatRelativeTime(expiresDate),
-      sessionInfo,
+      country || '-',
+      carrier || '-',
+      formatRelativeTime(new Date(p.expiresAt)),
+      rotation,
     ];
   });
 

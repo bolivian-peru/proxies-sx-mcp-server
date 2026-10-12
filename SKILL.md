@@ -1,113 +1,41 @@
 ---
 name: proxies-sx-mcp-server
-description: Manage Proxies.sx mobile/residential proxies, mint x402 USDC sessions, rotate IPs, and consume marketplace data services from any MCP-compatible AI agent (Claude Desktop, Cursor, Windsurf, Continue, Cline, Claude Code). Trigger this skill the moment the user wants to install / configure / use the Proxies.sx MCP server, integrate proxies into a Claude Desktop or Cursor workflow, mint a proxy without an API key (x402 autonomous mode), build an AI scraping agent that buys its own bandwidth, troubleshoot MCP tool errors, or pick between API-key mode and x402 wallet mode. Use it whenever the user mentions "Proxies.sx MCP", "@proxies-sx/mcp-server", "MCP proxy tools", "Claude Desktop proxy", "x402 mcp", "agent proxy purchase", "proxy MCP", or anything implying machine-driven proxy management — even if they don't explicitly ask for "this skill".
+description: Use Proxies.sx residential and mobile proxies from any MCP-compatible AI agent (Claude Desktop, Claude Code, Cursor, Windsurf, Cline, Continue). Trigger this skill when the user wants to install, configure or use the Proxies.sx MCP server, get a proxy URL for the Pool Gateway (gw.proxies.sx), check proxy stock per country, hold a session or an IP, manage dedicated mobile ports, read usage and pricing, open a support ticket, debug an MCP tool or gateway error, or let an agent pay for proxies with USDC (x402). Also when the user mentions "@proxies-sx/mcp-server", "Proxies.sx MCP", "proxy MCP", PROXIES_API_KEY, AGENT_WALLET_KEY, psx_ keys or pak_ keys.
 ---
 
 # Proxies.sx MCP Server
 
-Open-source [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 89 typed tools to any MCP-compatible AI agent. Two operating modes:
-
-- **API Key mode (MAIN path)** — agent acts on behalf of a logged-in Proxies.sx user with deposited GB balance (70 tools: ports, rotation, billing, pool gateway, payments, support, ops, etc.)
-- **x402 Autonomous mode (optional)** — agent pays for its own proxies with USDC on Base or Solana, no human account needed (19 tools: `x402_get_proxy`, `x402_rotate_ip`, `x402_get_pool_access`, …)
-
-API Key mode is the primary, recommended path for most integrations — it's simpler (no wallet/gas handling) and works for anyone with a Proxies.sx account. x402 exists specifically for **account-less agents** that need to pay per-request with crypto.
+Open-source [Model Context Protocol](https://modelcontextprotocol.io) server for Proxies.sx: residential and mobile proxy bandwidth, metered per GB.
 
 Source: <https://github.com/bolivian-peru/proxies-sx-mcp-server> · npm: [`@proxies-sx/mcp-server`](https://www.npmjs.com/package/@proxies-sx/mcp-server) · License: MIT.
 
----
+## What the product is
 
-## When to use this skill
+- **Pool Gateway** (the main product): one endpoint, `gw.proxies.sx` (HTTP `7000`, SOCKS5 `7001`). The proxy username chooses pool, country, IP class, session and rotation. One proxy password works for every country.
+- **Dedicated ports**: one port bound to one carrier modem, in the few countries that have modems.
+- **Private Pools and Reserved IPs**: a separate gateway credential scoped to chosen countries, which can hold individual devices for itself.
 
-Use it for any of these intents:
+## Pick the mode first
 
-- "Set up Proxies.sx MCP in Claude Desktop / Cursor / Windsurf / Cline / Continue"
-- "Configure my agent to buy proxies with USDC"
-- "Add the proxy MCP server to my AI workflow"
-- "Help me debug an MCP tool error from `@proxies-sx/mcp-server`"
-- "Pick between API key and x402 mode"
-- "What tools does the Proxies.sx MCP have?"
-- "How do I scrape with mobile IPs from Claude / Cursor?"
-- "Use x402 to mint a proxy from my agent"
-- "My agent wallet balance is low — top up the session"
-- "I need mobile vs residential exit IPs, not just any peer"
+| Mode | Environment | Use it when |
+|---|---|---|
+| **API key** (standard) | `PROXIES_API_KEY=psx_...` | The user has, or can create, a Proxies.sx account with GB on it. This is the default. |
+| **x402 wallet** (optional) | `AGENT_WALLET_KEY=0x...` | The agent must pay by itself in USDC on Base and cannot hold an account. |
+| **Both** | both variables | Every tool of both modes is listed. |
 
-If the user mentions any of: `@proxies-sx/mcp-server`, MCP proxy, x402 MCP, agent-driven proxy buying, AGENT_WALLET_KEY, PROXIES_API_KEY env var, `psx_` keys, `pak_` keys (in MCP context), or `mcp.json` configuration — this skill applies.
+Create the key at [client.proxies.sx/account](https://client.proxies.sx/account). A customer key can hold `ports:read`, `ports:write`, `ports:rotate`, `billing:read`, `account:read`, `account:write`, `traffic:read`, `tickets:read`, `tickets:write`. It cannot hold `billing:write`: buying traffic through the API is for reseller and admin keys, and a customer buys in the dashboard at [client.proxies.sx/purchase](https://client.proxies.sx/purchase).
 
----
+## Install
 
-## Decide the mode FIRST
+Every client runs `npx -y @proxies-sx/mcp-server` with the key in the environment.
 
-Before installing or generating code, ask which mode the user wants. They behave very differently.
+**Claude Code**
 
-### Mode A — API Key (70 tools, requires a Proxies.sx account) — MAIN path
-
-Use when the user already has a Proxies.sx account (or is willing to create one and deposit GB) and wants their agent to manage **their** proxy fleet. This is the default recommendation unless the user specifically needs an account-less, wallet-only agent.
-
-- Tools: account, ports, rotation, billing, pool gateway (16), crypto payments, support tickets, x402 session management, ops (11, admin-only)
-- Auth: `PROXIES_API_KEY=psx_...` env var (mint at [client.proxies.sx/account](https://client.proxies.sx/account))
-- Cost: pays from the user's existing account balance (deposited GB, $4/GB, volume-discounted to $2.40/GB at 250 GB+)
-
-### Mode B — x402 Autonomous (19 tools, no account needed) — optional, for account-less agents
-
-Use when the user is building a fully autonomous agent that must pay for its own bandwidth with crypto, with zero human account setup.
-
-- Dedicated-proxy tools: `x402_get_proxy`, `x402_get_pricing`, `x402_wallet_balance`, `x402_rotate_ip`, `x402_list_sessions`, `x402_check_session`, `x402_list_countries`, `x402_list_cities`, `x402_list_carriers`, `x402_extend_session`, `x402_service_status`
-- Pool Gateway tools: `x402_get_pool_access`, `x402_pool_credit`, `x402_pool_topup`, `x402_pool_regenerate`, `x402_pool_connection`, `x402_pool_usage`, `x402_pool_pricing`, `get_pool_stock`
-- Auth: `AGENT_WALLET_KEY=<base58 Solana key | hex EVM key>` env var
-- Cost: USDC paid per request from the agent's own wallet (Solana ~$0.0001 gas, Base ~$0.01 gas). $4/GB, metered, volume-discounted to $2.40/GB at 250 GB+.
-
-### Mode C — Both at once
-
-The MCP server happily exposes both modes simultaneously. Set both env vars; tools that need API key use it, tools that need wallet use that. Many production setups run both.
-
----
-
-## Install — copy-paste configs
-
-The user just needs **one of these blocks** in their MCP client's config file. Generate the right one based on their client + chosen mode.
-
-### Claude Desktop
-
-File: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows)
-
-**Mode A (API Key):**
-```json
-{
-  "mcpServers": {
-    "proxies-sx": {
-      "command": "npx",
-      "args": ["-y", "@proxies-sx/mcp-server"],
-      "env": {
-        "PROXIES_API_KEY": "psx_YOUR_API_KEY"
-      }
-    }
-  }
-}
+```bash
+claude mcp add proxies-sx -e PROXIES_API_KEY=psx_YOUR_API_KEY -- npx -y @proxies-sx/mcp-server
 ```
 
-**Mode B (x402 Autonomous):**
-```json
-{
-  "mcpServers": {
-    "proxies-sx": {
-      "command": "npx",
-      "args": ["-y", "@proxies-sx/mcp-server"],
-      "env": {
-        "AGENT_WALLET_KEY": "your_solana_or_base_private_key",
-        "PREFERRED_NETWORK": "solana"
-      }
-    }
-  }
-}
-```
-
-**Mode C (both):** combine both env vars in the same `env` object.
-
-After editing, fully quit Claude Desktop and reopen — MCP servers are loaded at startup.
-
-### Cursor
-
-File: `.cursor/mcp.json` in the project root.
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows), **Cursor** (`~/.cursor/mcp.json` or `.cursor/mcp.json`), **Windsurf** (`~/.codeium/windsurf/mcp_config.json`), Cline, Continue and Roo Code all take the same block:
 
 ```json
 {
@@ -121,270 +49,279 @@ File: `.cursor/mcp.json` in the project root.
 }
 ```
 
-### Windsurf
+For wallet mode put `AGENT_WALLET_KEY` in `env` instead of, or next to, `PROXIES_API_KEY`. Restart the client after editing its config. To verify, ask the agent to call `get_service_status` (needs no account) and then `get_account_summary`.
 
-Same JSON shape, in `~/.codeium/windsurf/mcp_config.json`.
+## Pool Gateway rules
 
-### Cline / Continue / Roo Code
+Username grammar: `psx_<account>-<pool>-<country>[-token-value ...]`. Let `pool_build_proxy_url` write it; it refuses or warns about the mistakes below.
 
-All use the same `mcpServers` JSON format. Drop the same block into their config (paths vary).
+- `peer` is the main pool: residential and mobile devices in most countries. `mbl` is carrier modems in exactly US, GB, FR, NL, PL and GE. **GE is Georgia, not Germany: `mbl-de` never works, use `peer-de`.**
+- IP class: `-iptype-mobile`, `-iptype-residential`, `-iptype-isp`. The ISP (static) class is served only when named.
+- Rotation: `sticky` and `hard` both hold one device; `auto5`/`auto10`/`auto20`/`auto60` move to another device on that interval; `ondemand` picks again per connection.
+- `sticky`, `hard` and `auto*` persist across connections only with `-sid-<id>`. `-session-` is ignored by the gateway without an error.
+- Sticky holds the device, not the IP: a mobile carrier can change the exit IP. For an address that stays, use a residential peer or a Reserved IP.
+- Limits per account: 500 concurrent connections, 250 sessions.
+- You pay per GB; time is free. Never quote a price from memory: call `get_pricing`.
+- The gateway password is the proxy password from `pool_get_my_credentials` (or a `pak_` key), not the account login password.
 
-### Verify install
+## Common tasks
 
-```bash
-npx -y @proxies-sx/mcp-server --help
-# Should print version + usage.
+**Get a proxy for a country (API key mode: start here)**
+
+```
+1. pool_get_stock {country: "de"}            -> what is online there, per pool and class
+2. pool_get_my_credentials                    -> proxyUsername and proxyPassword
+3. pool_build_proxy_url {proxyUsername, password, pool: "peer", country: "de",
+                         ipType: "residential", rotation: "sticky", sid: "job1"}
+4. use the returned proxyUrl in any HTTP client
 ```
 
-If your MCP client has a "Tools" panel, you should see 89 tools prefixed `proxies-sx` (70 if only `PROXIES_API_KEY` is set, 19 if only `AGENT_WALLET_KEY` is set). If you see 0, the env vars are missing or the binary failed to download — check the client's MCP error log.
+**Target a city or carrier**: `pool_get_facets {country}` lists the values with stock; pass one as `city`, `state`, `carrier` or `asn` to `pool_build_proxy_url`.
 
----
+**A request through the proxy failed**: pass the gateway's error text to `pool_explain_error`. `E_AUTH_INVALID` is a wrong proxy password; `E_BALANCE_EXHAUSTED` is an empty balance (check `get_account_usage`, the password is fine); `E_NO_STOCK_COUNTRY` means nothing is online for that pool, country and filters; `E_SESSION_LIMIT` is cleared with `pool_close_all_sessions`.
+
+**Check balance and usage**: `get_account_summary`, `get_account_usage`.
+
+**Hold one IP for yourself**: `private_pool_list` (or `private_pool_build {countries}`), then `reserved_ip_reserve {poolId, country}`; release it with `reserved_ip_release`. The connection strings come back with `pak_********` as the password: put the key from `private_pool_reveal {poolId}` in its place. The server refuses when a country has too little unreserved stock and says so.
+
+**A dedicated port on a carrier modem**
+
+```
+1. list_available_countries                   -> countries with a free modem, and their countryId
+2. create_port {countryId}                    -> connection strings
+3. rotate_port {portId}                       -> another modem; the port numbers change
+4. configure_auto_rotation {portId, enabled: true, intervalMinutes: 30}
+5. delete_port {portId}
+```
+
+**Reach a person**: `create_support_ticket {subject, message}`, then `get_ticket`.
+
+**Pay with a wallet instead of an account (x402 mode)**
+
+```
+1. x402_pool_pricing, pool_get_stock          -> tiers, live prices, stock
+2. x402_wallet_balance                        -> USDC and gas on Base
+3. x402_get_pool_access {tier: "peer", traffic_gb: 1}   -> pays on-chain, returns one credential
+4. pool_build_proxy_url with that username and password
+5. x402_pool_credit / x402_pool_topup         -> GB left / add more
+```
 
 ## Tool catalog
 
-89 tools organized by category. Use the table to pick the right tool for the user's intent.
+<!-- tools:start -->
+Generated from the code of version 3.0.0 by `npm run build:manifest`. Do not edit by hand.
 
-### API Key mode (70 tools)
+**Pool Gateway**
 
-| Category | Count | Representative tools |
+| Tool | What it does |
+|---|---|
+| `pool_get_stock` | Get live Pool Gateway stock, no account needed. Also listed in wallet mode. |
+| `pool_get_facets` | List the cities, states, carriers (with ASN and class) and IP classes that have stock in one country, with counts, no account needed. Also listed in wallet mode. |
+| `pool_build_proxy_url` | Build a ready-to-use Pool Gateway proxy URL (gw.proxies.sx, HTTP 7000 or SOCKS5 7001). Also listed in wallet mode. |
+| `pool_explain_error` | Explain a Pool Gateway error and say what to do about it. Also listed in wallet mode. |
+| `pool_get_my_credentials` | Get your Pool Gateway proxy username and proxy password with ready HTTP and SOCKS5 URLs. |
+| `pool_set_proxy_password` | Set a new proxy password (at least 6 characters). |
+| `pool_get_my_stats` | Get your own Pool Gateway traffic and open connections, plus the health score of the pool and how many devices are connected to it. |
+| `pool_list_sessions` | List your saved Pool Gateway sessions: pool, country, carrier, rotation mode, bytes and last activity. |
+| `pool_close_session` | Close one Pool Gateway session by the sessionKey from pool_list_sessions. |
+| `pool_close_all_sessions` | Close every saved Pool Gateway session of the account. |
+
+**Private Pool and Reserved IPs**
+
+| Tool | What it does |
+|---|---|
+| `private_pool_list` | List your Private Pools with their countries, status, gateway username, connection strings with the password masked (private_pool_reveal shows the key) and remaining GB. |
+| `private_pool_build` | Create a Private Pool paid from the account's existing GB balance: no purchase, traffic is metered from the same balance. |
+| `private_pool_reveal` | Show the gateway password (pak_ key) of a Private Pool. |
+| `private_pool_usage` | Get the traffic of a Private Pool per day, in MB. |
+| `reserved_ip_list` | List the Reserved IPs a Private Pool holds: country, class, carrier, city, rotation mode, whether the device is online, the exit IP last seen, and connection strings with the password masked. |
+| `reserved_ip_reserve` | Reserve one device for a Private Pool so no other customer is routed through it, and get its connection strings with the password masked. |
+| `reserved_ip_rotate` | Move a Reserved IP to a different device in the same country now. |
+| `reserved_ip_extend` | Change how long a Reserved IP is kept without traffic. |
+| `reserved_ip_set_rotation` | Set whether a Reserved IP moves to another device on a schedule: off (hold the device, the default) or every 5, 10, 20 or 60 minutes. |
+| `reserved_ip_release` | Give a Reserved IP back to the shared pool. |
+
+**Account**
+
+| Tool | What it does |
+|---|---|
+| `get_account_summary` | Get the account balance, free port slots, traffic bought and left, and any account alerts. |
+| `get_account_usage` | Get traffic purchased, used and still available, split into Pool Gateway traffic and dedicated-port traffic. |
+
+**Billing**
+
+| Tool | What it does |
+|---|---|
+| `get_pricing` | Get the live price per GB, the volume discounts, the free port-slot tiers and your current tier. |
+| `calculate_price` | Calculate what a GB amount costs with the volume discount applied. |
+| `purchase_shared_traffic` | Buy traffic in GB from the account balance. |
+| `coupon_validate` | Check whether a coupon code is valid for an order, without using it. |
+| `coupon_redeem` | Redeem a standalone coupon that grants free GB or port slots to the account. |
+| `get_payment_history` | List the account's past payments and crypto top-up orders. |
+
+**Crypto payments**
+
+| Tool | What it does |
+|---|---|
+| `create_crypto_payment` | Create a crypto order that tops up the account balance and return its hosted payment link. |
+| `check_crypto_payment_status` | Check whether a crypto order is still unpaid, confirming, paid, expired or cancelled, and whether the balance was credited. |
+| `get_pending_crypto_payments` | List the account's crypto orders that are not finished yet, with their payment links. |
+| `cancel_crypto_payment` | Cancel a crypto order that has not been paid yet. |
+| `get_crypto_payment_info` | Check whether crypto top-ups are available right now and which currencies the payment page accepts. |
+
+**Dedicated ports**
+
+| Tool | What it does |
+|---|---|
+| `list_available_countries` | List the countries where a dedicated port can be created right now, with the countryId create_port needs. |
+| `list_ports` | List your dedicated ports with status, country, carrier, expiry and port ids. |
+| `get_port` | Get one dedicated port with its location and ready-to-use HTTP and SOCKS5 connection strings (contains the port password). |
+| `create_port` | Create a dedicated port on a carrier modem and return its connection strings. |
+| `delete_port` | Delete a dedicated port and free its slot. |
+| `update_port_credentials` | Change the login and/or password of a dedicated port. |
+| `update_os_fingerprint` | Set the OS fingerprint (TCP/IP signature) a dedicated port presents. |
+| `reconfigure_port` | Move a dedicated port to another country, carrier or city. |
+| `extend_port` | Add hours to a dedicated port's expiry. |
+
+**Port status**
+
+| Tool | What it does |
+|---|---|
+| `get_port_status` | Check whether a dedicated port is online, offline or expired. |
+| `get_port_ip` | Get the server address a dedicated port listens on. |
+| `ping_port` | Test that a dedicated port answers and measure its latency. |
+| `speed_test_port` | Run a speed test through a dedicated port (download, upload, ping). |
+
+**Port rotation**
+
+| Tool | What it does |
+|---|---|
+| `rotate_port` | Move a dedicated port to another modem in the same location. |
+| `check_rotation_availability` | Check whether a dedicated port can be rotated now, how long the cooldown still runs and how many other modems are free. |
+| `configure_auto_rotation` | Turn automatic rotation of a dedicated port on or off and set its interval. |
+| `get_rotation_history` | Get the past rotations of a dedicated port: when, how triggered, the location it moved to and whether it worked. |
+| `get_rotation_token_url` | Get the public rotation link of a dedicated port. |
+
+**Utilities**
+
+| Tool | What it does |
+|---|---|
+| `get_proxy_connection_string` | Build the HTTP or SOCKS5 connection string of a dedicated port (contains the port password). |
+| `get_all_proxy_formats` | Get a dedicated port in every common format: URLs, host:port, environment variables, curl, Python and Node.js snippets, and its public rotation link. |
+| `get_service_status` | Check whether Proxies.sx is healthy right now: open Pool Gateway incidents, the state of the API, gateway and relay, and recent uptime. Also listed in wallet mode. |
+| `get_os_fingerprint_options` | List the OS fingerprint values create_port and update_os_fingerprint accept. |
+
+**Support**
+
+| Tool | What it does |
+|---|---|
+| `create_support_ticket` | Open a support ticket that a person at Proxies.sx reads and answers. |
+| `list_my_tickets` | List your support tickets with their status and IDs. |
+| `get_ticket` | Get one support ticket with the original message and every reply. |
+| `reply_to_ticket` | Add a reply to one of your support tickets. |
+| `close_ticket` | Close one of your support tickets once the problem is solved. |
+
+**Pool access keys (reseller accounts)**
+
+| Tool | What it does |
+|---|---|
+| `pool_mint_key` | Create a Pool Access Key (pak_) for one of your customers; it is used as the proxy password. |
+| `pool_list_keys` | List your Pool Access Keys with usage, cap and expiry; the key values are masked. |
+| `pool_topup_key` | Add GB to a Pool Access Key's cap and/or extend its expiry in one step. |
+| `pool_update_key` | Change a Pool Access Key's label, enabled flag, cap, expiry or quality tier. |
+| `pool_regenerate_key` | Replace the secret pak_ value of a Pool Access Key. |
+| `pool_reveal_key` | Show the full pak_ value of a Pool Access Key. |
+| `pool_delete_key` | Delete a Pool Access Key. |
+| `pool_key_usage` | Get the traffic of one Pool Access Key per day, in MB. |
+| `pool_key_audit` | Get the audit log of one Pool Access Key, newest first: created, changed, topped up, regenerated, revealed, deleted, and gateway logins that worked or failed. |
+
+**x402 session management**
+
+| Tool | What it does |
+|---|---|
+| `get_x402_session` | Get details of your x402 session including all ports. |
+| `list_x402_ports` | List all ports in your x402 session with connection strings and expiration times |
+| `get_x402_port_status` | Get detailed status of a specific port including traffic usage and connection info |
+| `get_sessions_by_wallet` | List all x402 sessions associated with your wallet address. |
+| `get_session_status` | Get quick status check for a session including traffic usage and expiration |
+| `replace_x402_port` | Replace an offline port of an x402 session with a new port on another device, at no charge. |
+| `calculate_x402_topup` | Calculate what it costs to add traffic and/or time to an x402 session. |
+| `topup_x402_session` | Add traffic and/or time to an x402 session. |
+
+**Ops (admin keys only)**
+
+| Tool | What it does |
+|---|---|
+| `ops_get_user` | Customer 360 view: balance, pool-gateway usage, ports, and (if a farmer) their AI note. |
+| `ops_get_user_audit` | Recent ops-agent actions taken on this user. |
+| `ops_reconcile_payments` | Read-only Stripe-vs-DB payment view for a user (confirmed total + pending). |
+| `ops_list_tickets` | List support tickets (admin view). |
+| `ops_reply_ticket` | Post an admin reply to a ticket, optionally emailing the customer. |
+| `ops_set_slots` | Set a user's port slot limit (capped). |
+| `ops_credit_balance` | Credit a user's balance in USD (admin credit). |
+| `ops_email_user` | Send a personalized email to one user (hourly rate-capped). |
+| `ops_list_farmers` | List farmer AI notes (shared operational memory). |
+| `ops_get_farmer` | Farmer fleet funnel (total/online/verified/listed/routable) + AI note. |
+| `ops_write_farmer_note` | Write/append a farmer AI note (situation, nextAction, free note) — shared with future AI sessions. |
+
+**x402 wallet (optional, no account)**
+
+| Tool | What it does |
+|---|---|
+| `x402_get_proxy` | Buy a dedicated mobile proxy on one carrier modem by paying USDC from the agent wallet; no account needed. |
+| `x402_get_pricing` | Get the live x402 price per GB, the smallest purchase, the allowed duration and the payment networks, and compare the cost of a purchase with the wallet balance. |
+| `x402_list_sessions` | List the active x402 proxy sessions this wallet bought from this machine, with location, expiry and proxy host. |
+| `x402_check_session` | Get status, time left, traffic used and the connection strings of an x402 proxy session. |
+| `x402_wallet_balance` | Get the agent wallet address and its USDC and ETH (gas) balance on the Base network. |
+| `x402_rotate_ip` | Move an x402 proxy to another modem so it gets a different exit IP. |
+| `x402_list_countries` | List the countries where x402_get_proxy can create a proxy right now, with the number of free modems. |
+| `x402_extend_session` | Add hours to an x402 proxy session. |
+| `x402_service_status` | Check that the x402 payment service is up, and show the wallet balance and how many sessions are active or about to expire. |
+| `x402_get_pool_access` | Buy Pool Gateway traffic by paying USDC from the agent wallet; no account needed. |
+| `x402_pool_credit` | Get the GB bought, used and left on an x402 pool session. |
+| `x402_pool_topup` | Add GB and/or time to an x402 pool session. |
+| `x402_pool_regenerate` | Replace the password of an x402 pool credential, for example after a leak. |
+| `x402_pool_connection` | Show the gateway host, port, username and password of an x402 pool session again. |
+| `x402_pool_usage` | Get the traffic of an x402 pool session per day, in MB. |
+| `x402_pool_pricing` | Get the Pool Gateway tiers that can be bought with x402 and their live price per GB and smallest purchase. |
+<!-- tools:end -->
+
+## Errors
+
+A failing tool returns an MCP error result (`isError: true`). For the common cases the text ends with a `What to do:` line; follow it instead of retrying blindly.
+
+| Error | Cause | Fix |
 |---|---|---|
-| Account | 2 | `get_account_summary`, `get_account_usage` |
-| Port management | 7 | `list_ports`, `create_port`, `delete_port`, `update_port_credentials`, `update_os_fingerprint`, `reconfigure_port`, `get_port` |
-| Port status | 4 | `get_port_status`, `get_port_ip`, `ping_port`, `speed_test_port` |
-| Rotation | 5 | `rotate_port`, `check_rotation_availability`, `configure_auto_rotation`, `get_rotation_history`, `get_rotation_token_url` |
-| Billing | 3 | `get_pricing` ($4/GB, volume-discounted to $2.40/GB at 250GB+), `calculate_price`, `purchase_shared_traffic` |
-| Crypto payments | 5 | `create_crypto_payment`, `check_crypto_payment_status`, `get_pending_crypto_payments`, `cancel_crypto_payment`, `get_crypto_payment_info` |
-| Reference | 1 | `list_available_countries` |
-| Utilities | 3 | `get_proxy_connection_string`, `get_all_proxy_formats`, `get_os_fingerprint_options` |
-| Support | 5 | `create_support_ticket`, `list_my_tickets`, `get_ticket`, `reply_to_ticket`, `close_ticket` |
-| x402 session mgmt | 8 | `get_x402_session`, `list_x402_ports`, `get_x402_port_status`, `get_sessions_by_wallet`, `get_session_status`, `replace_x402_port`, `calculate_x402_topup`, `topup_x402_session` |
-| Ops (admin only, `ops:*` scopes) | 11 | `ops_get_user`, `ops_get_user_audit`, `ops_reconcile_payments`, `ops_list_tickets`, `ops_reply_ticket`, `ops_set_slots`, `ops_credit_balance`, `ops_email_user`, `ops_list_farmers`, `ops_get_farmer`, `ops_write_farmer_note` |
-| **Pool Gateway** | **16** | see below |
+| 401 on any API tool | `PROXIES_API_KEY` missing, wrong, expired or revoked | New key at [client.proxies.sx/account](https://client.proxies.sx/account) |
+| 403 "missing required scope" | The key lacks that scope | Create a key with it. `billing:write` and `customers:*` are not available to customer keys |
+| 429 | Rate limit | Wait a minute; do not loop |
+| 5xx | Server-side failure | Retry once, then `get_service_status` |
+| "Insufficient USDC balance" (x402) | Wallet cannot cover the price | Send USDC on Base to the wallet address in the message |
+| "Unknown tool: x402_..." | Server started without `AGENT_WALLET_KEY` | Add it and restart the client |
+| Client shows no tools | Config file is not valid JSON, or no key is set | Fix the file, restart the client |
 
-**Pool Gateway (16 tools)** — the flagship one-port product, self-service + reseller management:
+## Security
 
-| Tool | What it does |
-|---|---|
-| `pool_get_stock` | Online endpoint counts per country (no auth needed) |
-| `pool_build_proxy_url` | In-tool DSL builder: pool/country/carrier/city/**iptype**/sid/rot — no network call |
-| `pool_list_sessions` | List live gateway sessions (traffic, exit IP, country) |
-| `pool_close_session` | Close one live session |
-| `pool_get_my_credentials` | Your own proxyUsername + ready-to-use HTTP/SOCKS5 connect strings |
-| `pool_get_my_stats` | Your own usage + aggregated pool health |
-| `pool_set_proxy_password` | Set/update your proxy auth password (separate from account login) |
-| `pool_mint_key` | Mint a Pool Access Key (`pak_`) for a customer (reseller role) |
-| `pool_list_keys` | List your Pool Access Keys (masked) |
-| `pool_update_key` | Update label/enabled/trafficCapGB/expiresAt/qualityTier |
-| `pool_topup_key` | Atomically add cap/extend expiry |
-| `pool_regenerate_key` | Rotate a key's secret |
-| `pool_reveal_key` | Reveal the full `pak_` secret (audit-logged) |
-| `pool_delete_key` | Delete a key |
-| `pool_key_usage` | Daily in/out MB time-series for one key |
-| `pool_key_audit` | Forensic audit log for one key |
-
-### x402 Autonomous mode (19 tools)
-
-**Dedicated proxy + session management (11 tools)**
-
-| Tool | What it does |
-|---|---|
-| `x402_get_proxy` | Buy a dedicated proxy with USDC ($4/GB, metered). Pays on-chain, returns credentials. |
-| `x402_get_pricing` | Get current pricing ($4/GB, metered, volume-discounted). |
-| `x402_wallet_balance` | Check the agent's USDC balance on Base + Solana. |
-| `x402_list_sessions` | List the agent's active sessions. |
-| `x402_check_session` | Status of a specific session by token. |
-| `x402_rotate_ip` | Rotate the IP for a session (free). |
-| `x402_list_countries` | Available countries with live device counts. Currently: US, GB, FR, NL, PL, GE (Georgia). |
-| `x402_list_cities` | Cities in a country. |
-| `x402_list_carriers` | Mobile carriers in a country. |
-| `x402_extend_session` | Extend session duration for FREE (duration-only top-up). |
-| `x402_service_status` | Health check for the x402 service. |
-
-(To add traffic to a dedicated-port session, use `calculate_x402_topup` / `topup_x402_session` from the session-management group.)
-
-**Pool Gateway access (8 tools)** — one credential reaches every country in your tier via the username DSL. v1 tier = `mbl` ($4/GB, production ProxySmart modems, 6 countries: US/GB/FR/NL/PL/GE, HTTP :7000).
-
-| Tool | What it does |
-|---|---|
-| `x402_get_pool_access` | Buy Pool Gateway access with USDC. Returns one DSL credential + caches the session token. |
-| `x402_pool_credit` | Remaining GB for a pool session (cached token if omitted). |
-| `x402_pool_topup` | Pay USDC for more GB (duration-only is free). |
-| `x402_pool_regenerate` | Rotate the credential secret (same username, new password). |
-| `x402_pool_connection` | Re-emit credentials (recovery). |
-| `x402_pool_usage` | Per-day MB usage series (default 30 days, max 365). |
-| `x402_pool_pricing` | Tier catalog + username DSL (no auth needed). |
-| `get_pool_stock` | Public online endpoint counts per country (no IPs). |
-
-> Pool quality copy: `mbl` is the production tier (6 countries: US/GB/FR/NL/PL/GE). **Sticky pins the modem, not the IP** — carrier NAT may still re-issue the egress IP. On the API-key side, `pool_build_proxy_url` also supports `ipType` (`mobile`/`residential`/`datacenter`) to hard-filter the `peer` pool to one exit class.
-
----
-
-## Common patterns
-
-Generate code that matches the user's intent. Here are the recipes most users want:
-
-### "Manage my account's proxies" (API key mode — MAIN path, start here)
-
-```
-1. Tool: list_ports — see what you have
-2. Tool: create_port with country="us" — add a new one
-3. Tool: get_proxy_connection_string with portId — get formatted URLs
-4. Tool: rotate_port — get a new IP on demand
-5. Tool: configure_auto_rotation with interval=30 — set up auto IP rotation every 30 minutes
-```
-
-### "Get one credential that works for every country in my tier" (API key mode, Pool Gateway)
-
-```
-1. Tool: pool_get_my_credentials — get your proxyUsername + connect strings
-2. Tool: pool_build_proxy_url with pool="peer", country="us", ipType="residential", rotation="sticky", sid="job1"
-   — builds a URL that hard-filters to residential peer exit IPs in the US, pinned for the session
-3. Tool: pool_get_my_stats — check usage
-```
-
-### "Buy a proxy and use it" (x402 mode)
-
-```
-1. Tool: x402_get_proxy with country="us", traffic=1
-2. Save the returned sessionToken (x402s_...) and proxy credentials
-3. Use the proxy in any HTTP client
-4. When done, optional: calculate_x402_topup + topup_x402_session to add traffic
-```
-
-### "Buy pool access, one credential for every country" (x402 mode)
-
-```
-1. Tool: x402_pool_pricing — see the tier catalog + username DSL (no wallet needed)
-2. Tool: get_pool_stock — check which countries currently have capacity
-3. Tool: x402_get_pool_access with traffic_gb=5 (tier defaults to mbl)
-4. Use the returned credential, switching country via the username DSL:
-   psx_xxx-mbl-us, psx_xxx-mbl-pl, ... (HTTP proxy on port 7000)
-5. Tool: x402_pool_credit — check remaining GB; x402_pool_topup to add more
-```
-
-### "Refill my proxy session before it expires"
-
-```
-1. Tool: x402_check_session with sessionToken — see remaining traffic + duration
-2. Tool: calculate_x402_topup with addTrafficGB=2 — preview cost
-3. Tool: topup_x402_session with addTrafficGB=2 + paymentSignature — pay USDC and extend
-```
-
-### "Replace an offline port for free" (x402 mode)
-
-```
-1. Tool: list_x402_ports with sessionToken — find offline ones
-2. Tool: replace_x402_port with portId — get a new port on a different device (free, max 3/session)
-```
-
-### "Top up account balance with crypto" (API key mode)
-
-```
-1. Tool: create_crypto_payment with amount=50 — get a payment URL/QR
-2. User pays at the URL with any of 50+ supported coins
-3. Tool: check_crypto_payment_status with paymentId — confirm
-4. Balance auto-credited
-```
-
----
+1. `PROXIES_API_KEY` is a password. Never paste it into shared logs, gists or screenshots. If exposed, revoke it at [client.proxies.sx/account](https://client.proxies.sx/account).
+2. `AGENT_WALLET_KEY` controls real USDC. Use a wallet that holds only what the agent may spend.
+3. Tools whose description says "Returns a secret" print a proxy password or a `pak_` key. Do not log their output.
+4. Do not commit `.mcp.json` or any config file that carries a key.
+5. The API never returns the exit IP of a dedicated port or pool session. `reserved_ip_list` shows the exit IP of a device you reserved; never publish it.
 
 ## Environment variables
 
-| Var | Required for | Purpose |
-|---|---|---|
-| `PROXIES_API_KEY` | API key mode | Authenticates as a Proxies.sx user. Format: `psx_*`. Mint at [client.proxies.sx/account](https://client.proxies.sx/account). |
-| `AGENT_WALLET_KEY` | x402 mode | Private key for the agent's wallet. Format: base58 (Solana) or 0x-hex (EVM/Base). |
-| `PREFERRED_NETWORK` | x402 mode (optional) | `solana` or `base`. Defaults to `solana` (faster + cheaper). |
-| `BASE_RPC_URL` | x402 mode (optional) | Override default Base RPC. Default uses public Base RPC. |
-| `PROXIES_API_URL` | optional | Override `https://api.proxies.sx/v1` base URL (rarely needed). |
-
----
-
-## Errors and how to fix them
-
-| Error pattern | Likely cause | Fix |
-|---|---|---|
-| `401 Unauthorized` on API tool | `PROXIES_API_KEY` missing/revoked | Re-mint at [client.proxies.sx/account](https://client.proxies.sx/account) |
-| `403 Forbidden` | API key scope insufficient | Add `customers:write` (or whichever scope the tool needs) |
-| `429 Rate limited` | Too many calls in short window | Back off, retry with exponential delay (start 1s) |
-| `Insufficient USDC balance` from x402 tool | Wallet has no USDC on the chosen network | Top up the wallet, or `PREFERRED_NETWORK=solana` if cheaper |
-| `Tool not found: x402_*` | Server started without `AGENT_WALLET_KEY` | Add the env var, restart the MCP client |
-| MCP server not starting | npm registry / network issue | `npx -y @proxies-sx/mcp-server@latest --help` to force fresh install |
-| MCP client shows 0 tools | Config syntax error | Validate `claude_desktop_config.json` is valid JSON; quit + reopen client |
-
-The server returns structured errors with a `retryable` boolean and a `suggestion` field — surface those to the user verbatim when an error happens.
-
----
-
-## Security non-negotiables
-
-DO NOT skip these. Burn them into any setup the user follows:
-
-1. **`PROXIES_API_KEY` is sensitive.** Treat it like a password. Don't paste it in shared chat logs, GitHub gists, or screenshots. If exposed, regenerate it at [client.proxies.sx/account](https://client.proxies.sx/account).
-2. **`AGENT_WALLET_KEY` is even more sensitive.** It controls real USDC. Rotate it if exposed; transfer remaining funds to a fresh wallet first.
-3. **Don't run the MCP server with `--inspect` or any debugger flag** when these env vars are set — heap dumps include them.
-4. **Audit `mcp.json` files in project repos** before committing; the standard pattern is to use a local `.env` and reference it indirectly, not inline secrets.
-5. **The `pak_` keys (Pool Gateway sub-keys)** are scoped per-customer, not per-agent — a leaked `pak_` only consumes the reseller's pool, not the platform's.
-
----
-
-## Pricing rule
-
-Wholesale rates are platform-configurable and change. Don't hardcode dollar amounts when the user asks "how much does X cost". Instead:
-
-- For a precise live answer: `Tool: get_pricing` (API key mode) or `x402_get_pricing` / `x402_pool_pricing` (x402 mode).
-- For ballpark guidance: tell the user "$4/GB, volume-discounted to $2.40/GB at 250 GB+ — the live rate is confirmed via the pricing tool, pin nothing in code".
-
----
-
-## Reference files in the repo
-
-| File | When to read |
+| Variable | Purpose |
 |---|---|
-| `README.md` | Marketing-friendly overview, install, examples |
-| `CHANGELOG.md` | Per-version breaking changes (read before bumping major) |
-| `CLAUDE.md` | Repo invariants for agents working ON the MCP server code |
-| `recipes/` | Per-framework integration examples (LangChain, CrewAI, raw MCP) |
-| `tests/` | Verify behavior — useful when debugging tool responses |
-| `src/tools/index.ts` | Tool registry — every API-key tool's source of truth |
-| `src/x402/tools.ts` | x402 autonomous tools |
-
----
-
-## Smoke test (run before reporting "done")
-
-After setting up, verify the MCP client actually sees the tools.
-
-```bash
-# 1. Verify the package installs and runs
-npx -y @proxies-sx/mcp-server --help
-# Should print version + usage info.
-
-# 2. (Optional) Run a single tool via curl-equivalent — only works if the MCP
-#    client exposes a way to call tools directly. Most don't, so the real test
-#    is asking your AI: "List my proxies via proxies-sx.list_ports"
-```
-
-In Claude Desktop / Cursor: ask the agent to call a tool and watch for the `proxies-sx` tool icon to appear in the response.
-
----
-
-## Checklist before handing off
-
-- [ ] User has `psx_*` and/or `AGENT_WALLET_KEY` env vars set
-- [ ] MCP client config file has the `proxies-sx` entry
-- [ ] Client fully restarted (not just window reload)
-- [ ] User can call at least one tool successfully
-- [ ] User knows where to mint a fresh API key if leaked: [client.proxies.sx/account](https://client.proxies.sx/account)
-- [ ] User knows pricing is live (don't quote stale numbers)
-
----
+| `PROXIES_API_KEY` | API key mode. Format `psx_...` |
+| `PROXIES_EMAIL`, `PROXIES_PASSWORD` | Alternative to the API key: account login |
+| `AGENT_WALLET_KEY` | x402 mode: `0x` private key of a USDC wallet on Base |
+| `BASE_RPC_URL` | x402 mode, optional: custom Base RPC |
+| `PROXIES_API_URL` | Optional API base. Default `https://api.proxies.sx`; a trailing `/v1` is accepted |
 
 ## Links
 
 - npm: <https://www.npmjs.com/package/@proxies-sx/mcp-server>
 - Source: <https://github.com/bolivian-peru/proxies-sx-mcp-server>
-- Customer dashboard MCP page: <https://client.proxies.sx/mcp-server>
+- Dashboard page: <https://client.proxies.sx/mcp-server>
+- Pool Gateway guide: <https://agents.proxies.sx/pool/skill.md>
 - Master Proxies.sx skill: <https://agents.proxies.sx/skill.md>
-- LLM-friendly API reference: <https://api.proxies.sx/v1/reseller/docs/llm>
-- Telegram support: [@proxyforai](https://t.me/proxyforai)

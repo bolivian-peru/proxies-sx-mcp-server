@@ -1,40 +1,35 @@
 /**
  * Reference Data API Module
- * Endpoints for countries (dynamic availability)
- *
- * NOTE: Cities, regions, and carriers endpoints were removed.
- * Real device availability is fetched dynamically at port creation time.
+ * Where dedicated ports can be created right now, with the ids POST /v1/ports accepts
  */
 
 import type { ApiClient } from './client.js';
-import type { Country, PaginatedResponse } from './types.js';
+import type { Country, NamedRef, WithFreeDevices } from './types.js';
 
 export class ReferenceApi {
   constructor(private readonly client: ApiClient) {}
 
   /**
-   * Get all available countries (for reference data)
+   * Get countries that have free dedicated-port devices
+   * Required scope: ports:read
    */
-  async getCountries(): Promise<Country[]> {
-    const response = await this.client.get<PaginatedResponse<Country>>('/v1/countries');
-    return response.data;
+  async getAvailableCountries(): Promise<WithFreeDevices<Country>[]> {
+    return this.client.get<WithFreeDevices<Country>[]>('/v1/countries/with-devices', { pool: 'dedicated' });
   }
 
   /**
-   * Get countries with available devices for port creation
-   * @param isPrivate - Filter by private (true) or shared (false) devices
+   * Get carriers with free devices in a country
+   * Required scope: ports:read
    */
-  async getAvailableCountries(isPrivate: boolean = false): Promise<(Country & { freeDeviceCount: number })[]> {
-    return this.client.get<(Country & { freeDeviceCount: number })[]>(
-      `/v1/countries/with-devices`,
-      { isPrivate: isPrivate.toString() }
-    );
+  async getCarriers(countryId: string): Promise<WithFreeDevices<NamedRef>[]> {
+    return this.client.get<WithFreeDevices<NamedRef>[]>(`/v1/carriers/country/${countryId}`);
   }
 
   /**
-   * Get country by ID
+   * Get cities with free devices in a country
+   * Required scope: ports:read
    */
-  async getCountry(countryId: string): Promise<Country> {
-    return this.client.get<Country>(`/v1/countries/${countryId}`);
+  async getCities(countryId: string): Promise<WithFreeDevices<NamedRef>[]> {
+    return this.client.get<WithFreeDevices<NamedRef>[]>(`/v1/cities/country/${countryId}`);
   }
 }

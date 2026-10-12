@@ -4,7 +4,7 @@
  */
 
 import type { ApiClient } from './client.js';
-import type { AccountSummary, TrafficBalanceBreakdown, Notification, PaginatedResponse } from './types.js';
+import type { AccountSummary, TrafficBalanceBreakdown, TrafficUsage } from './types.js';
 
 export class AccountApi {
   constructor(private readonly client: ApiClient) {}
@@ -26,42 +26,10 @@ export class AccountApi {
   }
 
   /**
-   * Get account notifications
-   * Required scope: account:read
+   * Get metered traffic per port; the Pool Gateway is the row with portId 'gw_pool'
+   * Required scope: traffic:read
    */
-  async getNotifications(params?: {
-    limit?: number;
-    offset?: number;
-    unreadOnly?: boolean;
-  }): Promise<PaginatedResponse<Notification>> {
-    return this.client.get<PaginatedResponse<Notification>>('/v1/account/notifications', {
-      limit: params?.limit ?? 20,
-      offset: params?.offset ?? 0,
-      unreadOnly: params?.unreadOnly,
-    });
-  }
-
-  /**
-   * Mark notification as read
-   * Required scope: account:write
-   */
-  async markNotificationRead(notificationId: string): Promise<Notification> {
-    return this.client.put<Notification>(`/v1/account/notifications/${notificationId}/read`);
-  }
-
-  /**
-   * Mark all notifications as read
-   * Required scope: account:write
-   */
-  async markAllNotificationsRead(): Promise<{ count: number }> {
-    return this.client.put<{ count: number }>('/v1/account/notifications/read-all');
-  }
-
-  /**
-   * Delete notification
-   * Required scope: account:write
-   */
-  async deleteNotification(notificationId: string): Promise<void> {
-    await this.client.delete(`/v1/account/notifications/${notificationId}`);
+  async getTrafficUsage(): Promise<TrafficUsage> {
+    return this.client.get<TrafficUsage>('/v1/traffic/usage');
   }
 }

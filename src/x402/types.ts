@@ -9,33 +9,6 @@
 export type X402Network = 'base' | 'solana';
 
 /**
- * Proxy tier levels
- */
-export type X402Tier = 'shared' | 'private';
-
-/**
- * x402 configuration
- */
-export interface X402Config {
-  /** Agent's wallet private key */
-  walletPrivateKey: string;
-  /** Preferred payment network */
-  preferredNetwork: X402Network;
-  /** Base RPC URL (optional) */
-  baseRpcUrl?: string;
-  /** Solana RPC URL (optional) */
-  solanaRpcUrl?: string;
-  /** API base URL */
-  apiBaseUrl: string;
-  /** Max daily spend in USDC (optional) */
-  maxDailySpendUSDC?: number;
-  /** Max per-transaction in USDC (optional) */
-  maxTransactionUSDC?: number;
-  /** Session cache path (optional) */
-  sessionCachePath?: string;
-}
-
-/**
  * Wallet balance info
  */
 export interface WalletBalance {
@@ -178,16 +151,23 @@ export interface SessionCacheData {
 }
 
 /**
- * Pricing info
+ * GET /v1/x402/pricing
  */
-export interface X402Pricing {
-  tier: X402Tier;
-  trafficRatePerGB: number;
-  totalCost: number;
-  breakdown: {
-    trafficCost: number;
-    trafficGB: number;
-  };
+export interface X402ProxyPricing {
+  shared: { trafficPricePerGB: number };
+  networks: Array<{ network: string; enabled: boolean }>;
+  minDurationSeconds: number;
+  maxDurationSeconds: number;
+  minTrafficGB: number;
+}
+
+/**
+ * GET /v1/x402/countries
+ */
+export interface X402Country {
+  code: string;
+  name: string;
+  availableDevices: number;
 }
 
 /**

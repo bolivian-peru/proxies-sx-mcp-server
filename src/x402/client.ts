@@ -5,26 +5,32 @@
 
 import type { AgentWallet } from './wallet.js';
 import type {
-  X402Network,
-  X402Tier,
   X402PaymentRequirement,
   X402AcceptOption,
   X402ProxyResponse,
   X402Session,
-  X402Pricing,
+  X402ProxyPricing,
+  X402Country,
   X402TopupResult,
   X402PoolResponse,
   X402PoolCredit,
   X402PoolPricing,
+  TransferResult,
 } from './types.js';
 
 /**
- * Pricing rates by tier - Duration is FREE, pay only for traffic
+ * The 402 answer carries the payment requirement at the top level
+ * ({ x402Version, accepts, ... }); older builds nested it under
+ * `paymentRequirement`. Both are read.
  */
-const PRICING_RATES: Record<X402Tier, { perGB: number }> = {
-  shared: { perGB: 4.0 },
-  private: { perGB: 8.0 },
-};
+function readPaymentRequirement(body: unknown): X402PaymentRequirement & { amountUSDC?: number } {
+  const data = body as { paymentRequirement?: X402PaymentRequirement } & Partial<X402PaymentRequirement>;
+  const requirement = data.paymentRequirement ?? data;
+  if (!Array.isArray(requirement.accepts) || requirement.accepts.length === 0) {
+    throw new Error('The 402 response carried no payment options');
+  }
+  return requirement as X402PaymentRequirement;
+}
 
 /**
  * x402 Protocol Client
@@ -33,87 +39,21 @@ const PRICING_RATES: Record<X402Tier, { perGB: number }> = {
 export class X402Client {
   private wallet: AgentWallet;
   private baseUrl: string;
-  private preferredNetwork: X402Network;
 
   constructor(
     wallet: AgentWallet,
-    baseUrl: string = 'https://api.proxies.sx/v1',
-    preferredNetwork: X402Network = 'base'
+    baseUrl: string = 'https://api.proxies.sx'
   ) {
     this.wallet = wallet;
     this.baseUrl = baseUrl.replace(/\/$/, '');
-    this.preferredNetwork = preferredNetwork;
   }
 
   /**
-   * Resolve the API base that always includes the `/v1` prefix.
-   * The MCP server constructs this client with `https://api.proxies.sx`
-   * (no `/v1`), so versioned routes must add it explicitly.
+   * The API base including the `/v1` prefix every route lives under,
+   * whichever way the base URL was configured.
    */
   private v1Base(): string {
     return /\/v1$/.test(this.baseUrl) ? this.baseUrl : `${this.baseUrl}/v1`;
-  }
-
-  /**
-   * Calculate pricing for a proxy configuration
-   */
-  calculatePricing(params: {
-    durationHours: number;
-    trafficGB: number;
-    tier?: X402Tier;
-  }): X402Pricing {
-    const tier = params.tier || 'shared';
-    const rates = PRICING_RATES[tier];
-
-    const trafficCost = params.trafficGB * rates.perGB;
-
-    return {
-      tier,
-      trafficRatePerGB: rates.perGB,
-      totalCost: trafficCost,
-      breakdown: {
-        trafficCost,
-        trafficGB: params.trafficGB,
-      },
-    };
-  }
-
-  /**
-   * Get pricing from API (more accurate, includes country-specific pricing)
-   */
-  async getPricingFromApi(params: {
-    country: string;
-    duration: number;
-    traffic: number;
-    tier?: X402Tier;
-  }): Promise<X402Pricing> {
-    const url = new URL(`${this.baseUrl}/x402/pricing`);
-    url.searchParams.set('country', params.country);
-    url.searchParams.set('duration', String(params.duration));
-    url.searchParams.set('traffic', String(params.traffic));
-    if (params.tier) {
-      url.searchParams.set('tier', params.tier);
-    }
-
-    try {
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        // Fall back to local calculation
-        return this.calculatePricing({
-          durationHours: params.duration / 3600,
-          trafficGB: params.traffic,
-          tier: params.tier,
-        });
-      }
-      return response.json() as Promise<X402Pricing>;
-    } catch {
-      // Fall back to local calculation
-      return this.calculatePricing({
-        durationHours: params.duration / 3600,
-        trafficGB: params.traffic,
-        tier: params.tier,
-      });
-    }
   }
 
   /**
@@ -123,16 +63,14 @@ export class X402Client {
     country: string;
     duration: number;
     traffic: number;
-    tier?: X402Tier;
     city?: string;
     carrier?: string;
   }): Promise<{ requirement: X402PaymentRequirement; url: string }> {
-    const url = new URL(`${this.baseUrl}/x402/proxy`);
+    const url = new URL(`${this.v1Base()}/x402/proxy`);
     url.searchParams.set('country', params.country);
     url.searchParams.set('duration', String(params.duration));
     url.searchParams.set('traffic', String(params.traffic));
 
-    if (params.tier) url.searchParams.set('tier', params.tier);
     if (params.city) url.searchParams.set('city', params.city);
     if (params.carrier) url.searchParams.set('carrier', params.carrier);
 
@@ -145,68 +83,64 @@ export class X402Client {
       );
     }
 
-    const data = await response.json() as { paymentRequirement?: X402PaymentRequirement };
-
-    if (!data.paymentRequirement) {
-      throw new Error('Missing paymentRequirement in 402 response');
-    }
-
     return {
-      requirement: data.paymentRequirement,
+      requirement: readPaymentRequirement(await response.json()),
       url: url.toString(),
     };
   }
 
   /**
-   * Find the best payment option for our preferred network
+   * The payment option for the network the wallet is on. The agent wallet
+   * pays on Base only, so an option for another chain is never taken.
    */
   private findPaymentOption(
     requirement: X402PaymentRequirement
   ): X402AcceptOption {
-    // Try preferred network first
-    const preferred = requirement.accepts.find(
-      (a) => a.network === this.preferredNetwork
-    );
-    if (preferred) return preferred;
-
-    // Fall back to first available
-    if (requirement.accepts.length > 0) {
-      return requirement.accepts[0];
+    const network = this.wallet.getNetwork();
+    const option = requirement.accepts.find((a) => a.network === network);
+    if (!option) {
+      throw new Error(`The API offered no payment option on the ${network} network`);
     }
-
-    throw new Error('No payment options available in 402 response');
+    return option;
   }
 
   /**
-   * Submit payment proof and get proxy credentials
+   * Pay one 402 option in USDC after checking the wallet can cover it.
    */
-  private async submitPaymentProof(
-    url: string,
-    transactionHash: string,
-    network: X402Network
-  ): Promise<X402ProxyResponse> {
-    const paymentProof = {
-      transactionHash,
-      network,
-      payer: this.wallet.address,
-    };
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'X-Payment': JSON.stringify(paymentProof),
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
+  private async pay(option: X402AcceptOption, amountMicroUSDC = option.maxAmountRequired): Promise<TransferResult> {
+    if (!(await this.wallet.hasSufficientBalance(amountMicroUSDC))) {
+      const balance = await this.wallet.getBalance();
+      const required = Number(amountMicroUSDC) / 1e6;
       throw new Error(
-        `Payment verification failed (${response.status}): ${error.message || JSON.stringify(error)}`
+        `Insufficient USDC balance. Required: $${required.toFixed(2)}, Available: ${balance.formatted}. ` +
+        `Send USDC to the wallet ${this.wallet.address} and try again.`
       );
     }
+    return this.wallet.sendUSDC(option.payTo, amountMicroUSDC);
+  }
 
-    return response.json() as Promise<X402ProxyResponse>;
+  /**
+   * Send the request that claims what an on-chain payment bought. The API
+   * reads the transaction hash from the Payment-Signature header. The USDC has
+   * already left the wallet, so a failure names the transaction: without the
+   * hash the payment could not be traced.
+   */
+  private async claimPayment<T>(what: string, url: string, transactionHash: string, init: RequestInit = {}): Promise<T> {
+    const paid = `USDC was already sent in transaction ${transactionHash}. Do not pay again: give this hash to Proxies.sx support.`;
+
+    let response: Response;
+    try {
+      response = await fetch(url, { ...init, headers: { ...init.headers, 'Payment-Signature': transactionHash } });
+    } catch (error) {
+      throw new Error(`${what} failed: ${error instanceof Error ? error.message : 'network error'}. ${paid}`);
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({})) as { message?: string };
+      throw new Error(`${what} failed (${response.status}): ${error.message || 'Unknown error'}. ${paid}`);
+    }
+
+    return response.json() as Promise<T>;
   }
 
   /**
@@ -221,7 +155,6 @@ export class X402Client {
     country: string;
     durationHours?: number;
     trafficGB?: number;
-    tier?: X402Tier;
     city?: string;
     carrier?: string;
   }): Promise<X402ProxyResponse> {
@@ -234,72 +167,22 @@ export class X402Client {
       country: params.country,
       duration,
       traffic: trafficGB,
-      tier: params.tier,
       city: params.city,
       carrier: params.carrier,
     });
 
-    // Step 2: Find payment option
-    const paymentOption = this.findPaymentOption(requirement);
+    // Step 2: Pay the option for our network
+    const transfer = await this.pay(this.findPaymentOption(requirement));
 
-    // Step 3: Check if we have sufficient balance
-    const hasBalance = await this.wallet.hasSufficientBalance(
-      paymentOption.maxAmountRequired
-    );
-
-    if (!hasBalance) {
-      const balance = await this.wallet.getBalance();
-      const required = Number(paymentOption.maxAmountRequired) / 1e6;
-      throw new Error(
-        `Insufficient USDC balance. Required: $${required.toFixed(2)}, Available: ${balance.formatted}. ` +
-        `Please top up wallet: ${this.wallet.address}`
-      );
-    }
-
-    // Step 4: Send USDC payment
-    const transfer = await this.wallet.sendUSDC(
-      paymentOption.payTo,
-      paymentOption.maxAmountRequired
-    );
-
-    // Step 5: Submit payment proof and get proxy
-    const result = await this.submitPaymentProof(
-      url,
-      transfer.transactionHash,
-      transfer.network
-    );
-
-    return result;
-  }
-
-  /**
-   * List sessions for this wallet
-   */
-  async listSessions(
-    status: 'active' | 'expired' | 'all' = 'active'
-  ): Promise<X402Session[]> {
-    const url = new URL(`${this.baseUrl}/x402/sessions/wallet/${this.wallet.address}`);
-    url.searchParams.set('status', status);
-
-    const response = await fetch(url.toString());
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return []; // No sessions found
-      }
-      const error = await response.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
-      throw new Error(`Failed to list sessions: ${error.message || 'Unknown error'}`);
-    }
-
-    const data = await response.json() as { sessions?: X402Session[] } | X402Session[];
-    return Array.isArray(data) ? data : (data.sessions || []);
+    // Step 3: Submit payment proof and get proxy
+    return this.claimPayment<X402ProxyResponse>('Payment verification', url, transfer.transactionHash);
   }
 
   /**
    * Get session status by ID
    */
   async getSessionStatus(sessionId: string): Promise<X402Session> {
-    const url = `${this.baseUrl}/x402/sessions/${sessionId}/status`;
+    const url = `${this.v1Base()}/x402/sessions/${sessionId}/status`;
 
     const response = await fetch(url);
 
@@ -353,11 +236,7 @@ export class X402Client {
    * Get the Pool Gateway tier catalog (no auth, no wallet needed)
    */
   async getPoolPricing(): Promise<X402PoolPricing> {
-    const response = await fetch(`${this.v1Base()}/x402/pool/pricing`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch pool pricing: ${response.status}`);
-    }
-    return response.json() as Promise<X402PoolPricing>;
+    return this.getPublic<X402PoolPricing>('/x402/pool/pricing');
   }
 
   /**
@@ -372,10 +251,10 @@ export class X402Client {
     rot?: string;
   }): Promise<X402PoolResponse> {
     const trafficGB = params.trafficGB || 1;
-    const tier = params.tier || 'mbl';
 
     const url = new URL(`${this.v1Base()}/x402/pool`);
-    url.searchParams.set('tier', tier);
+    // Without a tier the API uses its own default (see /x402/pool/pricing)
+    if (params.tier) url.searchParams.set('tier', params.tier);
     if (params.country) url.searchParams.set('country', params.country);
     url.searchParams.set('traffic', String(trafficGB));
     if (params.sid) url.searchParams.set('sid', params.sid);
@@ -392,44 +271,12 @@ export class X402Client {
       throw new Error(`Expected 402 Payment Required, got ${initial.status}: ${body}`);
     }
 
-    const data = await initial.json() as { paymentRequirement?: X402PaymentRequirement };
-    if (!data.paymentRequirement) {
-      throw new Error('Missing paymentRequirement in 402 pool response');
-    }
+    // Step 2: Pay the option for our network
+    const requirement = readPaymentRequirement(await initial.json());
+    const transfer = await this.pay(this.findPaymentOption(requirement));
 
-    // Step 2: Pick a payment option for our network
-    const paymentOption = this.findPaymentOption(data.paymentRequirement);
-
-    // Step 3: Ensure sufficient balance
-    const hasBalance = await this.wallet.hasSufficientBalance(paymentOption.maxAmountRequired);
-    if (!hasBalance) {
-      const balance = await this.wallet.getBalance();
-      const required = Number(paymentOption.maxAmountRequired) / 1e6;
-      throw new Error(
-        `Insufficient USDC balance. Required: $${required.toFixed(2)}, Available: ${balance.formatted}. ` +
-        `Please top up wallet: ${this.wallet.address}`
-      );
-    }
-
-    // Step 4: Pay USDC on-chain
-    const transfer = await this.wallet.sendUSDC(
-      paymentOption.payTo,
-      paymentOption.maxAmountRequired
-    );
-
-    // Step 5: Retry with Payment-Signature header
-    const paid = await fetch(url.toString(), {
-      headers: { 'Payment-Signature': transfer.transactionHash },
-    });
-
-    if (!paid.ok) {
-      const error = await paid.json().catch(() => ({ message: 'Unknown error' })) as { message?: string };
-      throw new Error(
-        `Pool access provisioning failed (${paid.status}): ${error.message || JSON.stringify(error)}`
-      );
-    }
-
-    return paid.json() as Promise<X402PoolResponse>;
+    // Step 3: Retry with Payment-Signature header
+    return this.claimPayment<X402PoolResponse>('Pool access provisioning', url.toString(), transfer.transactionHash);
   }
 
   /**
@@ -511,39 +358,22 @@ export class X402Client {
         throw new Error(`Pool top-up failed (${quoteRes.status}): ${error.message || 'Unknown error'}`);
       }
 
-      const quoteBody = await quoteRes.json() as {
-        paymentRequirement?: X402PaymentRequirement & { amountUSDC?: number };
-      };
-      const requirement = quoteBody.paymentRequirement;
+      const requirement = readPaymentRequirement(await quoteRes.json());
+      const option = this.findPaymentOption(requirement);
+      // amountUSDC in the 402 body is the session's own per-GB price; prefer it
+      const amountMicro = requirement.amountUSDC !== undefined
+        ? String(Math.ceil(Number(requirement.amountUSDC) * 1e6))
+        : option.maxAmountRequired;
 
-      let payTo: string | undefined;
-      let amountMicro: string | undefined;
-      if (requirement && Array.isArray(requirement.accepts) && requirement.accepts.length > 0) {
-        const option = this.findPaymentOption(requirement);
-        payTo = option.payTo;
-        // amountUSDC in the 402 body is the frozen session-tier price; prefer it
-        amountMicro = requirement.amountUSDC !== undefined
-          ? String(Math.ceil(Number(requirement.amountUSDC) * 1e6))
-          : option.maxAmountRequired;
-      }
-
-      // Fallback: derive from the public catalog if the 402 was not parseable
-      if (!payTo || !amountMicro) {
-        const pricing = await this.getPoolPricing();
-        const tiers = pricing.tiers || [];
-        const tierEntry = tiers.find((t) => t.tier === pricing.defaultTier) || tiers[0];
-        const pricePerGB = tierEntry?.pricePerGB ?? 4;
-        amountMicro = String(Math.ceil(params.addTrafficGB * pricePerGB * 1e6));
-        payTo = this.resolvePoolPayTo(pricing);
-        if (!payTo) {
-          throw new Error('Could not resolve pool top-up recipient address from /v1/x402/pool/pricing networks');
-        }
-      }
-
-      const transfer = await this.wallet.sendUSDC(payTo, amountMicro);
-      headers['Payment-Signature'] = transfer.transactionHash;
+      const transfer = await this.pay(option, amountMicro);
+      return this.claimPayment<X402PoolCredit>('Pool top-up', `${this.v1Base()}/x402/manage/pool/topup`, transfer.transactionHash, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
     }
 
+    // Duration only: free, no payment
     const response = await fetch(`${this.v1Base()}/x402/manage/pool/topup`, {
       method: 'POST',
       headers,
@@ -573,58 +403,35 @@ export class X402Client {
     return response.json() as Promise<X402PoolResponse>;
   }
 
-  /**
-   * Resolve the on-chain recipient address for a pool top-up from the catalog networks.
-   * The backend's network entries carry `recipientAddress`; older shapes may use
-   * payTo/recipient/address, so all are accepted. Picks the entry matching the
-   * wallet's preferred network when present.
-   */
-  private resolvePoolPayTo(pricing: X402PoolPricing): string | undefined {
-    const networks = (pricing.networks || []) as Array<Record<string, unknown>>;
-    if (networks.length === 0) return undefined;
-    const wanted = this.preferredNetwork;
-    const match = networks.find((n) => String(n.network || '').toLowerCase() === wanted) || networks[0];
-    const addr = (match.recipientAddress || match.payTo || match.recipient || match.address) as string | undefined;
-    return addr;
-  }
+  // ============ Public catalogue ============
 
-  /**
-   * Get public Pool Gateway stock (counts per country, no IPs)
-   */
-  async getPoolStock(): Promise<unknown> {
-    const response = await fetch(`${this.v1Base()}/gateway/pool/stock`);
+  private async getPublic<T>(path: string): Promise<T> {
+    const response = await fetch(`${this.v1Base()}${path}`);
     if (!response.ok) {
-      throw new Error(`Failed to fetch pool stock: ${response.status}`);
+      throw new Error(`GET ${path} failed with HTTP ${response.status}`);
     }
-    return response.json();
+    return response.json() as Promise<T>;
   }
 
   /**
-   * Get available countries for proxy selection
+   * Price per GB, traffic and duration limits, and payment networks for x402 proxies
    */
-  async getCountries(): Promise<{ code: string; name: string }[]> {
-    const url = `${this.baseUrl}/countries`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch countries');
-    }
-
-    return response.json() as Promise<{ code: string; name: string }[]>;
+  async getProxyPricing(): Promise<X402ProxyPricing> {
+    return this.getPublic<X402ProxyPricing>('/x402/pricing');
   }
 
   /**
-   * Get wallet address
+   * Countries where an x402 proxy can be bought right now
    */
-  getWalletAddress(): string {
-    return this.wallet.address;
+  async getCountries(): Promise<X402Country[]> {
+    return this.getPublic<X402Country[]>('/x402/countries');
   }
 
   /**
-   * Get preferred network
+   * x402 service health
    */
-  getPreferredNetwork(): X402Network {
-    return this.preferredNetwork;
+  async getHealth(): Promise<{ status: string; enabled: boolean }> {
+    return this.getPublic<{ status: string; enabled: boolean }>('/x402/health');
   }
 }
 
@@ -633,8 +440,7 @@ export class X402Client {
  */
 export function createX402Client(
   wallet: AgentWallet,
-  baseUrl?: string,
-  preferredNetwork?: X402Network
+  baseUrl?: string
 ): X402Client {
-  return new X402Client(wallet, baseUrl, preferredNetwork);
+  return new X402Client(wallet, baseUrl);
 }
