@@ -66,7 +66,7 @@ Gateway error codes (pass the text to `pool_explain_error`): E_AUTH_REQUIRED, E_
 ## Tools
 
 <!-- tools:start -->
-Generated from the code of version 3.0.0 by `npm run build:manifest`. Do not edit by hand.
+Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edit by hand.
 
 **Pool Gateway**
 

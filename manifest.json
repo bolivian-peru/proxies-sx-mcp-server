@@ -2,13 +2,13 @@
   "manifest_version": "0.3",
   "name": "proxies-sx-mcp-server",
   "display_name": "Proxies.sx",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Residential and mobile proxies for AI agents: Pool Gateway URLs, live stock per country, Private Pools and Reserved IPs, dedicated ports, billing and support. 88 tools with an API key, 16 more with an agent wallet.",
   "long_description": "Use Proxies.sx metered residential and mobile proxy bandwidth from Claude. The Pool Gateway (gw.proxies.sx, HTTP 7000 / SOCKS5 7001) is one endpoint with routing in the username: the peer pool covers most countries, the mbl pool is carrier modems in US, GB, FR, NL, PL and GE (Georgia). You pay per GB with a volume discount; time is free (the get_pricing tool reads the live price). Set PROXIES_API_KEY (create a key at https://client.proxies.sx/account) for the standard account path. AGENT_WALLET_KEY is the optional x402 path: pay per GB in USDC without an account.",
   "author": {
     "name": "Proxies.sx",
     "email": "maya@proxies.sx",
-    "url": "https://proxies.sx"
+    "url": "https://agents.proxies.sx/mcp/"
   },
   "repository": {
     "type": "git",
@@ -452,17 +452,27 @@
   "tools_generated": false,
   "keywords": [
     "mcp",
+    "mcp-server",
     "model-context-protocol",
-    "proxies",
-    "mobile-proxy",
-    "4g-proxy",
-    "claude",
-    "ai-agent",
-    "anthropic",
-    "proxy-management",
-    "ip-rotation",
     "residential-proxy",
-    "pool-gateway"
+    "mobile-proxy",
+    "rotating-proxy",
+    "proxy",
+    "proxies",
+    "socks5",
+    "http-proxy",
+    "web-scraping",
+    "ip-rotation",
+    "4g-proxy",
+    "ai-agent",
+    "ai-agents",
+    "claude",
+    "claude-code",
+    "cursor",
+    "anthropic",
+    "x402",
+    "pool-gateway",
+    "proxy-management"
   ],
   "license": "MIT",
   "privacy_policies": [

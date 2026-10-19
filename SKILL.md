@@ -109,7 +109,7 @@ Username grammar: `psx_<account>-<pool>-<country>[-token-value ...]`. Let `pool_
 ## Tool catalog
 
 <!-- tools:start -->
-Generated from the code of version 3.0.0 by `npm run build:manifest`. Do not edit by hand.
+Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edit by hand.
 
 **Pool Gateway**
 

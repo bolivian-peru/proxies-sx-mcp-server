@@ -2,8 +2,9 @@
 
 [![npm version](https://img.shields.io/npm/v/@proxies-sx/mcp-server.svg)](https://www.npmjs.com/package/@proxies-sx/mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Proxies.sx MCP server on Glama](https://glama.ai/mcp/servers/bolivian-peru/proxies-sx-mcp-server/badges/score.svg)](https://glama.ai/mcp/servers/bolivian-peru/proxies-sx-mcp-server)
 
-MCP (Model Context Protocol) server for [Proxies.sx](https://proxies.sx): residential and mobile proxies, metered per GB, that an AI agent can use and manage by itself.
+MCP (Model Context Protocol) server for [Proxies.sx](https://proxies.sx): [residential and mobile proxies](https://agents.proxies.sx/pool/) for AI agents, metered per GB. Claude, Cursor and any MCP client can get rotating or sticky HTTP/SOCKS5 proxy URLs, check live stock per country, rotate IPs and manage usage by themselves, for web scraping, data collection and browser automation.
 
 The main product is the **Pool Gateway**: one endpoint, `gw.proxies.sx` (HTTP `7000`, SOCKS5 `7001`), where the proxy username says which pool, country and session you want. With this server an agent reads live stock, gets its credentials, builds the proxy URL, watches usage and opens a support ticket when something is wrong. It can also manage dedicated ports on carrier modems, Private Pools and Reserved IPs.
 
@@ -136,7 +137,7 @@ The container speaks MCP over stdio (`-i` is required).
 ## Tools
 
 <!-- tools:start -->
-Generated from the code of version 3.0.0 by `npm run build:manifest`. Do not edit by hand.
+Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edit by hand.
 
 **Pool Gateway**
 

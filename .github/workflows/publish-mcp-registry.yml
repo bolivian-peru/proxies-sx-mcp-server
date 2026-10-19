@@ -1,0 +1,20 @@
+# Publishes server.json to the Official MCP Registry (registry.modelcontextprotocol.io).
+# Run it by hand after the matching npm version is live: the registry checks that
+# package.json "mcpName" in the published npm tarball equals server.json "name".
+name: Publish to MCP Registry
+on:
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mcp-publisher
+        run: curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+      - name: Log in with GitHub OIDC
+        run: ./mcp-publisher login github-oidc
+      - name: Publish
+        run: ./mcp-publisher publish
