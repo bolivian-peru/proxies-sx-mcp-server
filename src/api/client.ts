@@ -3,7 +3,7 @@
  * HTTP client with API key or JWT authentication
  */
 
-import { explainError } from '../utils/errors.js';
+import { explainApiError, type ApiErrorBody } from '../utils/errors.js';
 
 export type AuthType = 'apiKey' | 'jwt';
 
@@ -111,10 +111,7 @@ export class ApiClient {
         errorBody = { message: await response.text() };
       }
 
-      // class-validator answers with an array of messages
-      const raw = (errorBody as { message?: string | string[] })?.message;
-      const message = (Array.isArray(raw) ? raw.join('; ') : raw) || `HTTP ${response.status}: ${response.statusText}`;
-      throw new ApiClientError(explainError(message, response.status), response.status, errorBody);
+      throw new ApiClientError(explainApiError((errorBody ?? {}) as ApiErrorBody, response.status, response.statusText), response.status, errorBody);
     }
 
     if (!isJson) {

@@ -10,6 +10,7 @@ import { RotationApi } from './rotation.js';
 import { BillingApi } from './billing.js';
 import { ReferenceApi } from './reference.js';
 import { PaymentsApi } from './payments.js';
+import { PrivateModemsApi } from './private-modems.js';
 
 export * from './types.js';
 export * from './client.js';
@@ -20,6 +21,7 @@ export { RotationApi } from './rotation.js';
 export { BillingApi } from './billing.js';
 export { ReferenceApi } from './reference.js';
 export { PaymentsApi } from './payments.js';
+export * from './private-modems.js';
 
 /**
  * Combined Proxies.sx API Client
@@ -32,6 +34,7 @@ export class ProxiesApi {
   public readonly billing: BillingApi;
   public readonly reference: ReferenceApi;
   public readonly payments: PaymentsApi;
+  public readonly privateModems: PrivateModemsApi;
 
   constructor(config: ApiClientConfig) {
     this.client = createApiClient(config);
@@ -41,6 +44,7 @@ export class ProxiesApi {
     this.billing = new BillingApi(this.client);
     this.reference = new ReferenceApi(this.client);
     this.payments = new PaymentsApi(this.client);
+    this.privateModems = new PrivateModemsApi(this.client);
   }
 }
 

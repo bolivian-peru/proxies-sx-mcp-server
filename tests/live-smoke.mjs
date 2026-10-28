@@ -53,6 +53,10 @@ const plan = {
   private_pool_list: {},
   private_pool_usage: { needs: 'poolId' },
   reserved_ip_list: { needs: 'poolId' },
+  proxies_modem_catalog: { expect: /"tariffs"/ },
+  proxies_modem_quote: { args: { tariffId: 'smoke_test_no_such_plan' }, refusal: /not in the catalog/ },
+  proxies_modem_mine: { expect: /"modems"/ },
+  proxies_topup_status: { args: { sessionId: 'cs_smoke_test_no_such_session' }, refusal: /not found|does not offer|billing:topup|Cannot GET/i },
   get_account_summary: { expect: /Balance:/ },
   get_account_usage: { expect: /Pool Gateway:/ },
   get_pricing: { expect: /\/GB/ },
@@ -94,7 +98,7 @@ const plan = {
 
 const transport = new StdioClientTransport({
   command: process.execPath,
-  args: [fileURLToPath(new URL('../dist/index.js', import.meta.url))],
+  args: [fileURLToPath(new URL('../dist/index.js', import.meta.url)), '--toolset=full'],
   env: { PATH: process.env.PATH, PROXIES_API_KEY: apiKey, ...(process.env.PROXIES_API_URL ? { PROXIES_API_URL: process.env.PROXIES_API_URL } : {}) },
   stderr: 'pipe',
 });

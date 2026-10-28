@@ -29,9 +29,10 @@ proxies-sx-mcp/
 │   │   ├── ports.ts          # Port CRUD operations
 │   │   ├── rotation.ts       # Port rotation API
 │   │   ├── billing.ts        # Purchases API
-│   │   ├── payments.ts       # Crypto payments (CoinGate)
+│   │   ├── payments.ts       # Crypto payments (CoinGate) + card top-up (Stripe Checkout)
+│   │   ├── private-modems.ts # Private modems: catalog, orders (Idempotency-Key), renew, rotate
 │   │   └── reference.ts      # Countries/cities/carriers
-│   ├── tools/                # MCP tool definitions (70 API-key tools)
+│   ├── tools/                # MCP tool definitions (API-key tools; 20 listed by default, all with --toolset=full)
 │   │   ├── index.ts          # Tool registry (exports all tools)
 │   │   ├── account.ts        # get_account_summary, get_account_usage
 │   │   ├── ports.ts          # create_port, delete_port, etc.
@@ -40,7 +41,9 @@ proxies-sx-mcp/
 │   │   ├── billing.ts        # purchase_shared_traffic, etc.
 │   │   ├── reference.ts      # list_available_countries, etc.
 │   │   ├── utilities.ts      # get_proxy_connection_string, etc.
-│   │   ├── payments.ts       # create_crypto_payment, etc.
+│   │   ├── payments.ts       # proxies_topup_checkout/status, create_crypto_payment, etc.
+│   │   ├── private-modems.ts # proxies_modem_catalog/quote/buy/renew/rotate/mine
+│   │   ├── structured.ts     # structured() result + confirm: true check shared by the spending tools
 │   │   ├── support.ts        # create_support_ticket, etc.
 │   │   └── x402-session.ts   # get_x402_session, list_x402_ports
 │   ├── x402/                 # x402 Protocol - autonomous payments (19 tools)
@@ -83,7 +86,8 @@ main();
 Handles environment variable parsing and MCP server initialization:
 - `PROXIES_API_KEY` - API key authentication
 - `AGENT_WALLET_KEY` - x402 wallet private key
-- `PROXIES_API_URL` - Custom API base URL (default: `https://api.proxies.sx/v1`)
+- `PROXIES_API_URL` - Custom API base URL (default: `https://api.proxies.sx`; a trailing `/v1` is accepted)
+- `PROXIES_TOOLSET` / `--toolset=full` - list every API-key tool instead of the default 20 (`DEFAULT_TOOL_NAMES` in `src/tools/index.ts`)
 - `PREFERRED_NETWORK` - `base` or `solana` for x402
 - `BASE_RPC_URL` - Custom RPC endpoint
 
@@ -187,9 +191,9 @@ Available countries (dedicated mbl modem tier): US, GB, FR, NL, PL, GE  (the pee
 
 ---
 
-## Tools (89 Total)
+## Tools
 
-> 70 API-key-mode tools + 19 x402 autonomous tools. Includes the **ops** group (11 — admin/ops agent, scoped+capped+audited), the API-key **pool** group (16 — Pool Gateway: stock, DSL URL builder, sessions, own credentials/stats/proxy-password, pak mint/list/topup/update/regenerate/reveal/delete/usage/audit), and the wallet-side **x402 pool** group (8 — buy Pool Gateway access with USDC: purchase, credit, topup, regenerate, connection, usage, pricing, public stock). Source of truth: `agents-landing/docs-manifest.json` (validate with `npm run check:sync`).
+> Counts drift: `npm run build:manifest` prints the live numbers and regenerates `tools.json`, `manifest.json` and the tool tables in README/SKILL/llm.txt. As of 3.1.0: 96 API-key tools (20 listed by default) + 16 wallet tools. The list below is older and kept as a map of the groups. Includes the **ops** group (11 — admin/ops agent, scoped+capped+audited), the API-key **pool** group (16 — Pool Gateway: stock, DSL URL builder, sessions, own credentials/stats/proxy-password, pak mint/list/topup/update/regenerate/reveal/delete/usage/audit), and the wallet-side **x402 pool** group (8 — buy Pool Gateway access with USDC: purchase, credit, topup, regenerate, connection, usage, pricing, public stock). Source of truth: `agents-landing/docs-manifest.json` (validate with `npm run check:sync`).
 
 ### API Key Mode (70 Tools)
 
@@ -406,4 +410,4 @@ async function handleMyNewTool(args: any) {
 
 ---
 
-**Last Updated:** 2026-07-24
+**Last Updated:** 2026-10-28

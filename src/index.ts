@@ -7,7 +7,8 @@
  * residential and mobile proxies: Pool Gateway, dedicated ports, billing, support
  *
  * Usage:
- *   PROXIES_API_KEY=psx_xxx npx -y @proxies-sx/mcp-server
+ *   PROXIES_API_KEY=psx_xxx npx -y @proxies-sx/mcp-server              # default toolset (about 20 tools)
+ *   PROXIES_API_KEY=psx_xxx npx -y @proxies-sx/mcp-server --toolset=full  # every tool (or PROXIES_TOOLSET=full)
  *
  * Or add to Claude Desktop config:
  *   {

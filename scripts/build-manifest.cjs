@@ -16,13 +16,16 @@ const { resolve } = require('path');
 
 const root = resolve(__dirname, '..');
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf-8'));
-const { toolGroups, PUBLIC_TOOL_NAMES } = require(resolve(root, 'dist', 'tools', 'index.js'));
+const { toolGroups, PUBLIC_TOOL_NAMES, DEFAULT_TOOL_NAMES } = require(resolve(root, 'dist', 'tools', 'index.js'));
 const { x402ToolDefinitions } = require(resolve(root, 'dist', 'x402', 'tools.js'));
 
 const WALLET_CATEGORY = 'x402 wallet (optional, no account)';
 const firstSentence = (text) => text.split(/(?<=\.)\s/)[0];
 
-/** One row per registered tool. mode: where it is listed (public = every mode). */
+/**
+ * One row per registered tool. mode: where it is listed (public = every mode).
+ * default: listed without --toolset=full (wallet tools always are).
+ */
 function catalogueRow(tool, category, mode) {
   if (!tool.annotations) {
     console.error(`Tool without annotations: ${tool.name}`);
@@ -37,6 +40,8 @@ function catalogueRow(tool, category, mode) {
     readOnly: tool.annotations.readOnlyHint,
     destructive: tool.annotations.destructiveHint,
     mode,
+    default: mode === 'x402' || DEFAULT_TOOL_NAMES.includes(tool.name),
+    structured: !!tool.outputSchema,
     params: Object.keys(tool.inputSchema.properties || {}).map((name) => ({ name, required: required.includes(name) })),
   };
 }
@@ -55,12 +60,13 @@ const manifest = {
   name: 'proxies-sx-mcp-server',
   display_name: 'Proxies.sx',
   version: pkg.version,
-  description: `Residential and mobile proxies for AI agents: Pool Gateway URLs, live stock per country, Private Pools and Reserved IPs, dedicated ports, billing and support. ${apiTools.length} tools with an API key, ${x402ToolDefinitions.length} more with an agent wallet.`,
+  description: `Residential and mobile proxies for AI agents: Pool Gateway URLs, live stock per country, Private modems, card top-ups, Private Pools and Reserved IPs, dedicated ports, billing and support. ${DEFAULT_TOOL_NAMES.length} tools by default (${apiTools.length} with --toolset=full), ${x402ToolDefinitions.length} more with an agent wallet.`,
   long_description:
-    'Use Proxies.sx metered residential and mobile proxy bandwidth from Claude. ' +
+    'Use Proxies.sx metered residential and mobile proxy bandwidth and Private modems from Claude. ' +
     'The Pool Gateway (gw.proxies.sx, HTTP 7000 / SOCKS5 7001) is one endpoint with routing in the username: ' +
     'the peer pool covers most countries, the mbl pool is carrier modems in US, GB, FR, NL, PL and GE (Georgia). ' +
     'You pay per GB with a volume discount; time is free (the get_pricing tool reads the live price). ' +
+    'A Private modem is one dedicated 4G/5G modem rented by the day, week or month with unlimited traffic, paid from the balance (proxies_modem_* tools). ' +
     'Set PROXIES_API_KEY (create a key at https://client.proxies.sx/account) for the standard account path. ' +
     'AGENT_WALLET_KEY is the optional x402 path: pay per GB in USDC without an account.',
   author: { name: pkg.author, email: 'maya@proxies.sx', url: pkg.homepage },
@@ -112,15 +118,19 @@ writeFileSync(resolve(root, 'manifest.json'), JSON.stringify(manifest, null, 2) 
 
 /** The tool list as Markdown, one table per category. */
 function toolListMarkdown() {
-  const lines = [`Generated from the code of version ${pkg.version} by \`npm run build:manifest\`. Do not edit by hand.`];
+  const lines = [
+    `Generated from the code of version ${pkg.version} by \`npm run build:manifest\`. Do not edit by hand.`,
+    '',
+    `The ${DEFAULT_TOOL_NAMES.length} tools marked "Default" are listed without a flag; the others need \`--toolset=full\` (or \`PROXIES_TOOLSET=full\`). Wallet tools are always listed when a wallet is set.`,
+  ];
   let category;
   for (const row of catalogue) {
     if (row.category !== category) {
       category = row.category;
       lines.push('', `**${category}**`, '', '| Tool | What it does |', '|---|---|');
     }
-    const note = row.mode === 'public' ? ' Also listed in wallet mode.' : '';
-    lines.push(`| \`${row.name}\` | ${row.description}${note} |`);
+    const notes = [row.default && row.mode !== 'x402' ? 'Default.' : '', row.mode === 'public' ? 'Also listed in wallet mode.' : ''].filter(Boolean);
+    lines.push(`| \`${row.name}\` | ${[row.description, ...notes].join(' ')} |`);
   }
   return lines.join('\n');
 }
@@ -139,4 +149,4 @@ for (const file of ['README.md', 'SKILL.md', 'llm.txt']) {
   writeFileSync(path, `${text.slice(0, start + START.length)}\n${toolListMarkdown()}\n${text.slice(end)}`);
 }
 
-console.log(`v${pkg.version}: ${apiTools.length} API-key tools (${PUBLIC_TOOL_NAMES.length} of them public) + ${x402ToolDefinitions.length} wallet tools -> manifest.json, tools.json, README.md, SKILL.md, llm.txt`);
+console.log(`v${pkg.version}: ${apiTools.length} API-key tools (${DEFAULT_TOOL_NAMES.length} default, ${PUBLIC_TOOL_NAMES.length} public) + ${x402ToolDefinitions.length} wallet tools -> manifest.json, tools.json, README.md, SKILL.md, llm.txt`);

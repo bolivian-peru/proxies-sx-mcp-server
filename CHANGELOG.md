@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.1.0 (2026-10-28)
+
+Private modems and card top-ups, and a default toolset of 20 tools.
+
+### Breaking for clients that relied on seeing every tool
+- With an API key the server now lists **20 tools by default**, grouped by workflow: buy (`proxies_modem_catalog`, `proxies_modem_quote`, `proxies_modem_buy`, `proxies_modem_renew`, `proxies_topup_checkout`, `proxies_topup_status`, `get_pricing`), use (`pool_get_stock`, `pool_get_my_credentials`, `pool_build_proxy_url`, `pool_explain_error`, `proxies_modem_mine`, `proxies_modem_rotate`) and manage (`get_account_summary`, `get_account_usage`, `pool_set_proxy_password`, `get_service_status`, `create_support_ticket`, `list_my_tickets`, `get_ticket`). Every other API-key tool (dedicated ports, Private Pools and Reserved IPs, crypto orders, coupons, `pak_` keys, x402 session management, ops) is listed with `--toolset=full` on the command line or `PROXIES_TOOLSET=full` in the environment: `npx -y @proxies-sx/mcp-server --toolset=full`. A client that calls a hidden tool gets "Unknown tool". Wallet mode is unchanged: the x402 tools and the public tools are always listed when `AGENT_WALLET_KEY` is set.
+
+### Added
+- **Private modems** (`proxies_modem_*`): one dedicated 4G/5G modem rented by the day, week or month with unlimited traffic, paid from the account balance. `proxies_modem_catalog` (plans, stock, price in USD), `proxies_modem_quote` (price of a plan or of a renewal), `proxies_modem_buy`, `proxies_modem_renew`, `proxies_modem_rotate`, `proxies_modem_mine` (rented modems with credentials, open and failed orders). Offer a Private modem first for any dedicated, unlimited, exclusive-device, p0f or OpenVPN request.
+- **Card top-up** (`proxies_topup_checkout`, `proxies_topup_status`): the agent prepares a Stripe Checkout link that a person opens and pays; the tool then reports when the balance is credited.
+- **Spending rules.** `proxies_modem_buy`, `proxies_modem_renew` and `proxies_topup_checkout` do nothing without `confirm: true`, which the agent sets only after the user agreed to the exact USD amount; buy and renew also need `expectedPriceUsd` from the quote, and the API refuses a stale price (`price_changed`). Buy and renew send an `Idempotency-Key` (a generated UUID, or the `idempotencyKey` argument) and return the key they used, so a retry with the same key never buys twice. These three tools carry `destructiveHint: true`; buy and renew also `idempotentHint: true`.
+- **Structured results.** The eight new tools declare an `outputSchema` and return `structuredContent` next to the same data as text.
+- **API error codes.** When the API answers with a `code` and a `fix` (for example `scope_missing`, `spend_cap_reached`, `price_changed`, `no_stock`, `insufficient_balance`, `recent_checkout`, `renewal_open`), the tool error keeps the code and uses the API's fix as its `What to do:` line.
+- `server.json` lists `PROXIES_TOOLSET`, `PROXIES_EMAIL`, `PROXIES_PASSWORD`, `BASE_RPC_URL` and the `--toolset` argument; `tools.json` rows carry `default` (listed without a flag) and `structured` (has an outputSchema).
+- Tests: default versus full tool lists, the confirm and `expectedPriceUsd` refusals, the `Idempotency-Key` header and its reuse, the top-up link and status, an API error body with `code` and `fix`, and a scan of every description, schema and shipped document for an unmasked IPv4 address or the name of the modem supplier.
+
+### Notes
+- The `modems:purchase` and `billing:topup` API-key scopes, and the API-key card top-up route, ship with a later API release. Until then `proxies_modem_buy` and `proxies_modem_renew` answer with the API's refusal and its fix, and `proxies_topup_checkout` says that card top-ups are not offered to keys yet and points to the dashboard. The catalog, quote, mine and rotate tools work today with any key.
+- `purchase_shared_traffic` is unchanged: a customer key still cannot buy GB through the API.
+
+## 3.0.1 (2026-10-19)
+
+npm metadata only, no code change: package description and keywords, homepage `https://agents.proxies.sx/mcp/`, Glama badge in the README, `server.json` description and `websiteUrl`.
+
 ## 3.0.0 (2026-10-08)
 
 The server is brought in line with the live API. The tools a customer key can use were exercised against production for this release; reseller-only, admin-only and paid paths were checked up to the API's refusal and are pinned by route tests. Before this release, 27 of the tools failed or printed wrong output with the default configuration. This release also carries the changes of 2.4.2, which was never published to npm.

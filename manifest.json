@@ -2,13 +2,13 @@
   "manifest_version": "0.3",
   "name": "proxies-sx-mcp-server",
   "display_name": "Proxies.sx",
-  "version": "3.0.0",
-  "description": "Residential and mobile proxies for AI agents: Pool Gateway URLs, live stock per country, Private Pools and Reserved IPs, dedicated ports, billing and support. 88 tools with an API key, 16 more with an agent wallet.",
-  "long_description": "Use Proxies.sx metered residential and mobile proxy bandwidth from Claude. The Pool Gateway (gw.proxies.sx, HTTP 7000 / SOCKS5 7001) is one endpoint with routing in the username: the peer pool covers most countries, the mbl pool is carrier modems in US, GB, FR, NL, PL and GE (Georgia). You pay per GB with a volume discount; time is free (the get_pricing tool reads the live price). Set PROXIES_API_KEY (create a key at https://client.proxies.sx/account) for the standard account path. AGENT_WALLET_KEY is the optional x402 path: pay per GB in USDC without an account.",
+  "version": "3.1.0",
+  "description": "Residential and mobile proxies for AI agents: Pool Gateway URLs, live stock per country, Private modems, card top-ups, Private Pools and Reserved IPs, dedicated ports, billing and support. 20 tools by default (96 with --toolset=full), 16 more with an agent wallet.",
+  "long_description": "Use Proxies.sx metered residential and mobile proxy bandwidth and Private modems from Claude. The Pool Gateway (gw.proxies.sx, HTTP 7000 / SOCKS5 7001) is one endpoint with routing in the username: the peer pool covers most countries, the mbl pool is carrier modems in US, GB, FR, NL, PL and GE (Georgia). You pay per GB with a volume discount; time is free (the get_pricing tool reads the live price). A Private modem is one dedicated 4G/5G modem rented by the day, week or month with unlimited traffic, paid from the balance (proxies_modem_* tools). Set PROXIES_API_KEY (create a key at https://client.proxies.sx/account) for the standard account path. AGENT_WALLET_KEY is the optional x402 path: pay per GB in USDC without an account.",
   "author": {
     "name": "Proxies.sx",
     "email": "maya@proxies.sx",
-    "url": "https://proxies.sx"
+    "url": "https://agents.proxies.sx/mcp/"
   },
   "repository": {
     "type": "git",
@@ -71,6 +71,30 @@
     {
       "name": "pool_close_all_sessions",
       "description": "Close every saved Pool Gateway session of the account."
+    },
+    {
+      "name": "proxies_modem_catalog",
+      "description": "List the Private modem plans for sale right now: country, carrier, period (day, week or month), price in USD, stock, OpenVPN and p0f support, regions."
+    },
+    {
+      "name": "proxies_modem_quote",
+      "description": "Price check before spending."
+    },
+    {
+      "name": "proxies_modem_buy",
+      "description": "Rent a Private modem (one dedicated 4G/5G modem, unlimited traffic) from the account balance."
+    },
+    {
+      "name": "proxies_modem_renew",
+      "description": "Extend the rental of one of your Private modems from the account balance."
+    },
+    {
+      "name": "proxies_modem_rotate",
+      "description": "Ask one of your Private modems for a new IP address."
+    },
+    {
+      "name": "proxies_modem_mine",
+      "description": "List your rented Private modems: status, expiry, online state, HTTP and SOCKS5 credentials, rotation settings, auto-renew, plus open orders and recent failures."
     },
     {
       "name": "private_pool_list",
@@ -143,6 +167,14 @@
     {
       "name": "get_payment_history",
       "description": "List the account's past payments and crypto top-up orders."
+    },
+    {
+      "name": "proxies_topup_checkout",
+      "description": "Add money to the account balance by card: creates a Stripe Checkout page and returns its url and sessionId."
+    },
+    {
+      "name": "proxies_topup_status",
+      "description": "Check whether a card top-up started with proxies_topup_checkout was paid and credited to the balance (credited true or false)."
     },
     {
       "name": "create_crypto_payment",
@@ -452,17 +484,27 @@
   "tools_generated": false,
   "keywords": [
     "mcp",
+    "mcp-server",
     "model-context-protocol",
-    "proxies",
-    "mobile-proxy",
-    "4g-proxy",
-    "claude",
-    "ai-agent",
-    "anthropic",
-    "proxy-management",
-    "ip-rotation",
     "residential-proxy",
-    "pool-gateway"
+    "mobile-proxy",
+    "rotating-proxy",
+    "proxy",
+    "proxies",
+    "socks5",
+    "http-proxy",
+    "web-scraping",
+    "ip-rotation",
+    "4g-proxy",
+    "ai-agent",
+    "ai-agents",
+    "claude",
+    "claude-code",
+    "cursor",
+    "anthropic",
+    "x402",
+    "pool-gateway",
+    "proxy-management"
   ],
   "license": "MIT",
   "privacy_policies": [

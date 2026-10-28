@@ -1,7 +1,15 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { explainError, redactSecrets, GATEWAY_ERRORS } from '../src/utils/errors.js';
+import { explainError, explainApiError, redactSecrets, GATEWAY_ERRORS } from '../src/utils/errors.js';
 import { ApiClient } from '../src/api/client.js';
-import { createMcpServer, normalizeBaseUrl } from '../src/server.js';
+import { createMcpServer, normalizeBaseUrl, toolsetFrom } from '../src/server.js';
+
+type CallResult = { isError?: boolean; content: Array<{ text: string }>; structuredContent?: Record<string, unknown> };
+
+/** The tools/call handler of a server, as the SDK would invoke it. */
+function toolCall(server: unknown) {
+  const handler = (server as { _requestHandlers: Map<string, (request: unknown, extra: unknown) => Promise<CallResult>> })._requestHandlers.get('tools/call')!;
+  return (name: string, args: Record<string, unknown>) => handler({ method: 'tools/call', params: { name, arguments: args } }, {});
+}
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -37,6 +45,13 @@ describe('explainError', () => {
     [502, 'Bad Gateway', /get_service_status/],
   ])('HTTP %i "%s" gets an actionable hint', (status, message, hint) => {
     expect(explainError(message, status)).toMatch(hint);
+  });
+
+  it('prefers the fix the API sends over the generic hint and keeps the code', () => {
+    const text = explainApiError({ message: 'Price changed', code: 'price_changed', fix: 'Re-read the price and resend with a new Idempotency-Key.' }, 409);
+    expect(text).toBe('Price changed [price_changed]\nWhat to do: Re-read the price and resend with a new Idempotency-Key.');
+    expect(explainApiError({ message: ['a', 'b'] }, 400)).toBe('a; b');
+    expect(explainApiError({}, 502, 'Bad Gateway')).toMatch(/^HTTP 502: Bad Gateway\nWhat to do: /);
   });
 
   it('adds no hint to an ordinary refusal and never adds one twice', () => {
@@ -100,9 +115,17 @@ describe('server tool-error path', () => {
     expect(normalizeBaseUrl('http://localhost:4500/')).toBe('http://localhost:4500');
   });
 
+  it('reads the toolset from the command line first, then the environment, and refuses an unknown one', () => {
+    expect(toolsetFrom([], {})).toBe('default');
+    expect(toolsetFrom([], { PROXIES_TOOLSET: 'full' })).toBe('full');
+    expect(toolsetFrom(['--toolset=default'], { PROXIES_TOOLSET: 'full' })).toBe('default');
+    expect(toolsetFrom(['--toolset=full'], {})).toBe('full');
+    expect(() => toolsetFrom(['--toolset=everything'], {})).toThrow(/Unknown toolset "everything"/);
+  });
+
   it('returns isError with the hint and without the key when a tool fails', async () => {
     stubFetch(403, { message: 'API key missing required scope: billing:write' });
-    const { server } = await createMcpServer({ apiKey: 'psx_0123456789abcdef0123', baseUrl: 'https://api.proxies.sx/v1' });
+    const { server } = await createMcpServer({ apiKey: 'psx_0123456789abcdef0123', baseUrl: 'https://api.proxies.sx/v1', toolset: 'full' });
     const call = (server as unknown as { _requestHandlers: Map<string, (request: unknown, extra: unknown) => Promise<{ isError?: boolean; content: Array<{ text: string }> }>> })._requestHandlers.get('tools/call')!;
     const result = await call({ method: 'tools/call', params: { name: 'purchase_shared_traffic', arguments: { quantityGB: 1 } } }, {});
 
@@ -111,9 +134,74 @@ describe('server tool-error path', () => {
     expect(result.content[0].text).not.toContain('psx_0123456789abcdef0123');
   });
 
+  it('returns the API code and fix as an isError result for a purchase that the API refuses', async () => {
+    stubFetch(409, { statusCode: 409, message: 'The price of this plan changed', code: 'price_changed', fix: 'Read the price again, confirm it with the user and resend with the new expectedPriceUsd and a NEW Idempotency-Key.', timestamp: 'now', path: '/v1/private-modems/orders' });
+    const { server } = await createMcpServer({ apiKey: 'psx_0123456789abcdef0123' });
+    const result = await toolCall(server)('proxies_modem_buy', { tariffId: 't1', expectedPriceUsd: 10, confirm: true });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe('Error: The price of this plan changed [price_changed]\nWhat to do: Read the price again, confirm it with the user and resend with the new expectedPriceUsd and a NEW Idempotency-Key.');
+  });
+
+  it('buys nothing without confirm: true or without expectedPriceUsd, and sends an Idempotency-Key when it buys', async () => {
+    const fetchMock = stubFetch(201, { orderId: 'o1', kind: 'buy', status: 'pending', priceUsd: 10, quantity: 1 });
+    const { server } = await createMcpServer({ apiKey: 'psx_test' });
+    const call = toolCall(server);
+
+    const refused = await call('proxies_modem_buy', { tariffId: 't1', expectedPriceUsd: 10 });
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0].text).toMatch(/Nothing was bought: confirm is not true.*call again with confirm: true/);
+    const renewRefused = await call('proxies_modem_renew', { modemId: 'm1', expectedPriceUsd: 10, confirm: false });
+    expect(renewRefused.isError).toBe(true);
+    await expect(call('proxies_modem_buy', { tariffId: 't1', confirm: true })).rejects.toThrow(/Invalid arguments for proxies_modem_buy/);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const bought = await call('proxies_modem_buy', { tariffId: 't1', expectedPriceUsd: 10, confirm: true });
+    expect(bought.isError).toBeUndefined();
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, { headers: Record<string, string>; body: string }];
+    const key = init.headers['Idempotency-Key'];
+    expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(init.body).toBe('{"tariffId":"t1","expectedPriceUsd":10}');
+    expect(bought.structuredContent).toMatchObject({ idempotencyKey: key, orders: [{ orderId: 'o1' }] });
+    expect(bought.content[0].text).toContain(`Idempotency-Key used: ${key}`);
+
+    // A retry reuses the key the first call returned
+    await call('proxies_modem_buy', { tariffId: 't1', expectedPriceUsd: 10, confirm: true, idempotencyKey: key });
+    expect((fetchMock.mock.calls[1] as unknown as [string, { headers: Record<string, string> }])[1].headers['Idempotency-Key']).toBe(key);
+  });
+
+  it('prepares a card top-up for a person to pay and reports when it is credited', async () => {
+    const fetchMock = stubFetch(201, { url: 'https://checkout.stripe.com/c/pay/cs_1', sessionId: 'cs_1' });
+    const { server } = await createMcpServer({ apiKey: 'psx_test' });
+    const call = toolCall(server);
+
+    const refused = await call('proxies_topup_checkout', { amountUsd: 20 });
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0].text).toMatch(/Nothing was charged: confirm is not true/);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const checkout = await call('proxies_topup_checkout', { amountUsd: 20, confirm: true });
+    expect(checkout.structuredContent).toMatchObject({ url: 'https://checkout.stripe.com/c/pay/cs_1', sessionId: 'cs_1', amountUsd: 20 });
+    expect(checkout.content[0].text).toMatch(/A person must open the url and pay by card; the agent cannot/);
+
+    stubFetch(200, { credited: false });
+    const status = await call('proxies_topup_status', { sessionId: 'cs_1' });
+    expect(status.structuredContent).toMatchObject({ sessionId: 'cs_1', credited: false });
+    expect(status.content[0].text).toMatch(/Not paid yet/);
+  });
+
+  it('tells the agent that card top-ups are not offered to keys yet when the route is missing', async () => {
+    stubFetch(404, { statusCode: 404, message: 'Cannot POST /v1/stripe/create-balance-checkout' });
+    const { server } = await createMcpServer({ apiKey: 'psx_test' });
+    const result = await toolCall(server)('proxies_topup_checkout', { amountUsd: 20, confirm: true });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/does not offer card top-ups to API keys yet.*client\.proxies\.sx\/purchase/);
+    expect(result.content[0].text).not.toMatch(/Update @proxies-sx/);
+  });
+
   it('masks the exact key the server was started with, whatever its shape', async () => {
     stubFetch(400, { message: 'rejected credential old-style-key' });
-    const { server } = await createMcpServer({ apiKey: 'old-style-key' });
+    const { server } = await createMcpServer({ apiKey: 'old-style-key', toolset: 'full' });
     const call = (server as unknown as { _requestHandlers: Map<string, (request: unknown, extra: unknown) => Promise<{ content: Array<{ text: string }> }>> })._requestHandlers.get('tools/call')!;
     const result = await call({ method: 'tools/call', params: { name: 'list_ports', arguments: {} } }, {});
 

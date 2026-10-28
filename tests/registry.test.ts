@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Ajv from 'ajv';
 import { createMcpServer } from '../src/server.js';
-import { allToolDefinitions, allSchemas, toolGroups, PUBLIC_TOOL_NAMES } from '../src/tools/index.js';
+import { allToolDefinitions, allSchemas, toolGroups, DEFAULT_TOOL_NAMES, PUBLIC_TOOL_NAMES } from '../src/tools/index.js';
 import { x402ToolDefinitions, x402Schemas } from '../src/x402/tools.js';
 
 const API_KEY = 'psx_test';
@@ -19,7 +19,7 @@ describe('tool registry', () => {
   });
 
   it('registers a handler for every listed tool and lists a tool for every handler (both modes at once)', async () => {
-    const { toolHandlers, toolDefinitions } = await createMcpServer({ apiKey: API_KEY, walletPrivateKey: WALLET_KEY });
+    const { toolHandlers, toolDefinitions } = await createMcpServer({ apiKey: API_KEY, walletPrivateKey: WALLET_KEY, toolset: 'full' });
     expect(toolDefinitions.map(t => t.name).sort()).toEqual(everyDefinition.map(t => t.name).sort());
     expect(Object.keys(toolHandlers).sort()).toEqual(everyDefinition.map(t => t.name).sort());
     for (const tool of toolDefinitions) {
@@ -27,9 +27,22 @@ describe('tool registry', () => {
     }
   });
 
-  it('lists the API tools with an API key, and the public plus wallet tools with a wallet only', async () => {
-    const apiKeyMode = await createMcpServer({ apiKey: API_KEY });
-    expect(apiKeyMode.toolDefinitions.map(t => t.name)).toEqual(allToolDefinitions.map(t => t.name));
+  it('lists the default toolset with an API key, every API tool with toolset full, and the public plus wallet tools with a wallet only', async () => {
+    const defaultMode = await createMcpServer({ apiKey: API_KEY });
+    expect(defaultMode.toolDefinitions.map(t => t.name)).toEqual(allToolDefinitions.filter(t => DEFAULT_TOOL_NAMES.includes(t.name)).map(t => t.name));
+    expect(defaultMode.toolDefinitions).toHaveLength(20);
+    expect(DEFAULT_TOOL_NAMES).toHaveLength(20);
+    for (const name of DEFAULT_TOOL_NAMES) {
+      expect(allToolDefinitions.some(t => t.name === name), name).toBe(true);
+    }
+
+    const fullMode = await createMcpServer({ apiKey: API_KEY, toolset: 'full' });
+    expect(fullMode.toolDefinitions.map(t => t.name)).toEqual(allToolDefinitions.map(t => t.name));
+    expect(fullMode.toolDefinitions.length).toBeGreaterThan(defaultMode.toolDefinitions.length);
+
+    // The toolset flag never touches the wallet tools
+    const hybridDefault = await createMcpServer({ apiKey: API_KEY, walletPrivateKey: WALLET_KEY });
+    expect(hybridDefault.toolDefinitions.map(t => t.name).sort()).toEqual([...DEFAULT_TOOL_NAMES, ...x402ToolDefinitions.map(t => t.name)].sort());
 
     const walletMode = await createMcpServer({ walletPrivateKey: WALLET_KEY });
     expect(walletMode.toolDefinitions.map(t => t.name).sort()).toEqual([...PUBLIC_TOOL_NAMES, ...x402ToolDefinitions.map(t => t.name)].sort());
@@ -59,6 +72,9 @@ describe('tool registry', () => {
       'pool_close_session',
       'pool_delete_key',
       'pool_regenerate_key',
+      'proxies_modem_buy',
+      'proxies_modem_renew',
+      'proxies_topup_checkout',
       'reconfigure_port',
       'replace_x402_port',
       'reserved_ip_release',
@@ -67,6 +83,47 @@ describe('tool registry', () => {
       'x402_pool_regenerate',
       'x402_rotate_ip',
     ]);
+  });
+
+  it('marks the spending tools: an Idempotency-Key makes buy and renew idempotent, a top-up link is not', () => {
+    const spending = (name: string) => everyDefinition.find(t => t.name === name)!.annotations;
+    expect(spending('proxies_modem_buy')).toMatchObject({ destructiveHint: true, idempotentHint: true, readOnlyHint: false });
+    expect(spending('proxies_modem_renew')).toMatchObject({ destructiveHint: true, idempotentHint: true });
+    expect(spending('proxies_topup_checkout')).toMatchObject({ destructiveHint: true, idempotentHint: false });
+    for (const name of ['proxies_modem_buy', 'proxies_modem_renew', 'proxies_topup_checkout']) {
+      const tool = everyDefinition.find(t => t.name === name)!;
+      expect(tool.description, name).toMatch(/confirm: true/);
+      expect(Object.keys(tool.inputSchema.properties), name).toContain('confirm');
+    }
+  });
+
+  it('gives every tool with an outputSchema a valid object schema', () => {
+    const ajv = new Ajv({ strict: false, allErrors: true });
+    const structuredTools = everyDefinition.filter(t => 'outputSchema' in t);
+    expect(structuredTools.map(t => t.name)).toEqual([
+      'proxies_modem_catalog', 'proxies_modem_quote', 'proxies_modem_buy', 'proxies_modem_renew', 'proxies_modem_rotate', 'proxies_modem_mine',
+      'proxies_topup_checkout', 'proxies_topup_status',
+    ]);
+    for (const tool of structuredTools) {
+      const schema = (tool as { outputSchema: { type: string } }).outputSchema;
+      expect(schema.type, tool.name).toBe('object');
+      expect(() => ajv.compile(schema), tool.name).not.toThrow();
+    }
+  });
+
+  it('never names the modem supplier or an unmasked IP address in a description, schema or shipped document', () => {
+    // Addresses from the documentation ranges (RFC 5737) are allowed in examples
+    const UNMASKED_IPV4 = /\b(?!192\.0\.2\.|198\.51\.100\.|203\.0\.113\.|127\.0\.0\.)\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/;
+    for (const tool of everyDefinition) {
+      const text = JSON.stringify(tool);
+      expect(text, tool.name).not.toMatch(/coronium/i);
+      expect(text, tool.name).not.toMatch(UNMASKED_IPV4);
+    }
+    for (const file of ['README.md', 'SKILL.md', 'llm.txt', 'tools.json', 'manifest.json', 'server.json', 'CHANGELOG.md']) {
+      const text = readFileSync(join(__dirname, '..', file), 'utf8');
+      expect(text, file).not.toMatch(/coronium/i);
+      expect(text, file).not.toMatch(UNMASKED_IPV4);
+    }
   });
 
   it('gives every tool a valid JSON Schema that agrees with its zod schema on what is required', () => {

@@ -1,7 +1,7 @@
 {
   "name": "@proxies-sx/mcp-server",
-  "version": "3.0.0",
-  "description": "MCP (Model Context Protocol) server for Proxies.sx: residential and mobile proxies for AI agents (Pool Gateway URLs, live stock, dedicated ports, Private Pools, billing, support)",
+  "version": "3.1.0",
+  "description": "MCP server for residential and mobile proxies: AI agents get rotating and sticky proxy URLs (HTTP/SOCKS5), live stock per country, IP rotation, usage and billing. Proxies.sx Pool Gateway, metered per GB.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -20,17 +20,27 @@
   },
   "keywords": [
     "mcp",
+    "mcp-server",
     "model-context-protocol",
-    "proxies",
-    "mobile-proxy",
-    "4g-proxy",
-    "claude",
-    "ai-agent",
-    "anthropic",
-    "proxy-management",
-    "ip-rotation",
     "residential-proxy",
-    "pool-gateway"
+    "mobile-proxy",
+    "rotating-proxy",
+    "proxy",
+    "proxies",
+    "socks5",
+    "http-proxy",
+    "web-scraping",
+    "ip-rotation",
+    "4g-proxy",
+    "ai-agent",
+    "ai-agents",
+    "claude",
+    "claude-code",
+    "cursor",
+    "anthropic",
+    "x402",
+    "pool-gateway",
+    "proxy-management"
   ],
   "author": "Proxies.sx",
   "license": "MIT",
@@ -38,7 +48,7 @@
     "type": "git",
     "url": "https://github.com/bolivian-peru/proxies-sx-mcp-server.git"
   },
-  "homepage": "https://proxies.sx",
+  "homepage": "https://agents.proxies.sx/mcp/",
   "bugs": {
     "url": "https://github.com/bolivian-peru/proxies-sx-mcp-server/issues"
   },

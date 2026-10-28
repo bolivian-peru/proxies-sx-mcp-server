@@ -1,26 +1,74 @@
 /**
  * Payment Tools
- * MCP tools for CoinGate crypto top-ups of the account balance
+ * MCP tools that top up the account balance: by card through a Stripe
+ * Checkout link a person pays (proxies_topup_*), or in crypto through CoinGate.
  *
- * Creating and cancelling an order need the billing:write scope, which only
- * reseller and admin keys can hold. A customer pays in the dashboard.
+ * Card top-ups need an API key with the billing:topup scope and stay under the
+ * key's daily cap. Creating and cancelling a crypto order need billing:write,
+ * which only reseller and admin keys can hold. A customer pays in the dashboard.
  */
 
 import { z } from 'zod';
-import type { ProxiesApi } from '../api/index.js';
+import { ApiClientError, type ProxiesApi } from '../api/index.js';
 import { formatCurrency } from '../utils/formatting.js';
-import { readOnly, mutating, destructive } from './annotations.js';
+import { readOnly, mutating, destructive, spending } from './annotations.js';
+import { confirmProperty, requireConfirm, structured, type StructuredResult } from './structured.js';
 
 const MIN_TOPUP_USD = 10;
 const MAX_TOPUP_USD = 1000;
+const MIN_CARD_TOPUP_USD = 1;
 const NEEDS_BILLING_WRITE = 'Needs a key with the billing:write scope, which only reseller and admin keys can hold: a customer key gets 403, and a customer pays in the dashboard at https://client.proxies.sx/purchase.';
 
 const orderId = { type: 'string', description: 'Order ID from create_crypto_payment or get_pending_crypto_payments' };
+const sessionId = { type: 'string', description: 'sessionId returned by proxies_topup_checkout' };
 
 /**
- * Tool definitions for crypto payments
+ * Tool definitions for payments
  */
 export const paymentToolDefinitions = [
+  {
+    name: 'proxies_topup_checkout',
+    annotations: spending('Top Up Balance by Card'),
+    description: 'Add money to the account balance by card: creates a Stripe Checkout page and returns its url and sessionId. A human must open the url in a browser and pay; this tool and the agent cannot pay it. ' +
+      'The balance is credited after payment; the balance then pays for Private modems (proxies_modem_buy) and, in the dashboard, for GB. amountUsd is whole US dollars, at least 1. ' +
+      'Spends money: call it only after the user agreed to the exact amount and set confirm: true. Then poll proxies_topup_status about every 10 s for up to 15 min. ' +
+      'Needs an API key with the billing:topup scope (ticked in the dashboard API keys section); each key has a daily cap (spendCapUsdPerDay, default 100 USD, reset at 00:00 UTC): spend_cap_reached means wait for the reset or raise the cap in the dashboard. ' +
+      'Not for crypto (create_crypto_payment) or x402 wallets. Example: {"amountUsd": 20, "confirm": true}.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        amountUsd: { type: 'integer', minimum: MIN_CARD_TOPUP_USD, description: 'Amount to add in whole USD (at least 1)' },
+        confirm: confirmProperty,
+      },
+      required: ['amountUsd'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Stripe Checkout page for a person to open and pay' },
+        sessionId: { type: 'string' },
+        amountUsd: { type: 'number' },
+        next: { type: 'string' },
+      },
+      required: ['url', 'sessionId', 'amountUsd', 'next'],
+    },
+  },
+  {
+    name: 'proxies_topup_status',
+    annotations: readOnly('Top-Up Status'),
+    description: 'Check whether a card top-up started with proxies_topup_checkout was paid and credited to the balance (credited true or false). Poll about every 10 s for up to 15 min after giving the user the url; once credited, read the balance with get_account_summary. ' +
+      'Sessions older than 24 h are not reported. Needs the billing:topup scope. Example: {"sessionId": "cs_..."}.',
+    inputSchema: { type: 'object' as const, properties: { sessionId }, required: ['sessionId'] },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        sessionId: { type: 'string' },
+        credited: { type: 'boolean' },
+        next: { type: 'string' },
+      },
+      required: ['sessionId', 'credited', 'next'],
+    },
+  },
   {
     name: 'create_crypto_payment',
     annotations: mutating('Create Crypto Payment'),
@@ -79,6 +127,29 @@ const STATUS_MEANING: Record<string, string> = {
  */
 export function createPaymentToolHandlers(api: ProxiesApi) {
   return {
+    async proxies_topup_checkout(args: { amountUsd: number; confirm?: boolean }): Promise<StructuredResult> {
+      requireConfirm(args.confirm, 'charged');
+      try {
+        const checkout = await api.payments.createBalanceCheckout(args.amountUsd);
+        const next = 'A person must open the url and pay by card; the agent cannot. Then poll proxies_topup_status with this sessionId about every 10 s for up to 15 min.';
+        return structured({ url: checkout.url, sessionId: checkout.sessionId, amountUsd: args.amountUsd, next }, `Card top-up of ${formatCurrency(args.amountUsd)} prepared. ${next}`);
+      } catch (error) {
+        // The route answers 404 until the API offers card top-ups to API keys
+        if (error instanceof ApiClientError && error.statusCode === 404) {
+          throw new Error('The API does not offer card top-ups to API keys yet. Ask the user to add money in the dashboard at https://client.proxies.sx/purchase, then read get_account_summary.');
+        }
+        throw error;
+      }
+    },
+
+    async proxies_topup_status(args: { sessionId: string }): Promise<StructuredResult> {
+      const receipt = await api.payments.getBalanceCheckoutReceipt(args.sessionId);
+      const next = receipt.credited
+        ? 'The balance is credited: read it with get_account_summary and continue the purchase.'
+        : 'Not paid yet. Ask the user to finish the payment page, and poll again in about 10 s (give up after 15 min).';
+      return structured({ sessionId: args.sessionId, credited: receipt.credited, next }, next);
+    },
+
     async create_crypto_payment(args: { amount: number }): Promise<string> {
       try {
         const result = await api.payments.createCryptoOrder(args.amount);
@@ -188,6 +259,13 @@ export function createPaymentToolHandlers(api: ProxiesApi) {
  * Zod schemas for validation
  */
 export const paymentSchemas = {
+  proxies_topup_checkout: z.object({
+    amountUsd: z.number().int().min(MIN_CARD_TOPUP_USD),
+    confirm: z.boolean().optional(),
+  }),
+  proxies_topup_status: z.object({
+    sessionId: z.string().min(1).max(200),
+  }),
   create_crypto_payment: z.object({
     amount: z.number().min(MIN_TOPUP_USD).max(MAX_TOPUP_USD),
   }),
