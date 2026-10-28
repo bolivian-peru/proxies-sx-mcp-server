@@ -126,6 +126,22 @@ describe('tool registry', () => {
     }
   });
 
+  it('accepts the backend\'s real Private modem shapes in the output schemas (feature shares, nulls while setting up)', () => {
+    const ajv = new Ajv({ strict: false, allErrors: true });
+    const schemaOf = (name: string) => (allToolDefinitions.find(t => t.name === name) as unknown as { outputSchema: object }).outputSchema;
+    const order = { orderId: 'pmb1', kind: 'buy', status: 'pending', priceUsd: 12, modemId: null, countryName: 'Germany', carrierName: 'O2', period: 'day', quantity: 1, regionName: null, createdAt: null, error: null, refunded: false };
+    const samples: Array<[string, unknown]> = [
+      ['proxies_modem_catalog', { maxCartModems: 20, tariffs: [{ tariffId: 'pt_x', period: 'day', countryCode: 'DE', countryName: 'Germany', carrierId: null, carrierName: 'O2', stock: 3, priceUsd: 12, openvpn: 'some', p0f: 'none', p0fStock: 0, regions: [{ id: 'pr_x', name: 'Berlin', stock: 2, p0f: 0 }] }] }],
+      ['proxies_modem_mine', { liveError: false, openOrders: [order], recentFailed: [], modems: [{ id: 'm1', status: 'active', countryCode: 'DE', countryName: 'Germany', carrierName: 'O2', period: 'day', regionName: null, expiresAt: null, online: null, notAnswering: false, currentIp: null, rotationInterval: null, credentials: null, capabilities: null, rotationToken: null, autoRenew: false, autoRenewIssue: null, autoRenewPeriod: null }] }],
+      ['proxies_modem_quote', { tariffId: null, modemId: 'm1', priceUsd: null, period: 'week', stock: null, options: [{ period: 'day', days: 1, priceUsd: null, available: false, reason: 'Not available for this modem right now.', extendsTo: null }], next: 'x' }],
+      ['proxies_modem_buy', { idempotencyKey: 'k', orders: [order], cartId: null, next: 'x' }],
+    ];
+    for (const [name, sample] of samples) {
+      const validate = ajv.compile(schemaOf(name));
+      expect(validate(sample), `${name}: ${JSON.stringify(validate.errors)}`).toBe(true);
+    }
+  });
+
   it('gives every tool a valid JSON Schema that agrees with its zod schema on what is required', () => {
     const ajv = new Ajv({ strict: false, allErrors: true });
     for (const tool of everyDefinition) {

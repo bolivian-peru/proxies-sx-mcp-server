@@ -17,20 +17,24 @@ export interface ModemRegion {
   id: string;
   name: string;
   stock: number;
-  p0f: boolean;
+  /** Modems in this region with p0f. */
+  p0f: number;
 }
+
+/** How many modems of a plan offer a feature. */
+export type FeatureShare = 'all' | 'some' | 'none';
 
 export interface ModemTariff {
   tariffId: string;
   period: ModemPeriod;
   countryCode: string;
   countryName: string;
-  carrierId: string;
+  carrierId: string | null;
   carrierName: string;
   stock: number;
   priceUsd: number;
-  openvpn: boolean;
-  p0f: boolean;
+  openvpn: FeatureShare;
+  p0f: FeatureShare;
   p0fStock: number;
   regions: ModemRegion[];
 }
@@ -51,7 +55,7 @@ export interface ModemOrder {
   period: ModemPeriod;
   quantity: number;
   regionName: string | null;
-  createdAt: string;
+  createdAt: string | null;
   error: string | null;
   refunded: boolean;
 }
@@ -84,22 +88,22 @@ export interface Modem {
   carrierName: string;
   period: ModemPeriod;
   regionName: string | null;
-  expiresAt: string;
-  online: boolean;
+  expiresAt: string | null;
+  online: boolean | null;
   notAnswering: boolean;
   /** The exit IP of the caller's own rented modem. Shown to the owner only. */
   currentIp: string | null;
   rotationInterval: number | null;
-  credentials: { http: ModemCredential; socks5: ModemCredential | null };
-  capabilities: Record<string, boolean>;
+  credentials: { http: ModemCredential; socks5: ModemCredential | null } | null;
+  capabilities: Record<string, boolean> | null;
   rotationToken: string | null;
   autoRenew: boolean;
-  autoRenewIssue: string | null;
+  autoRenewIssue: { reason: string; priceUsd: number } | null;
   autoRenewPeriod: ModemPeriod | null;
 }
 
 export interface MyModems {
-  liveError: string | null;
+  liveError: boolean;
   openOrders: ModemOrder[];
   recentFailed: ModemOrder[];
   modems: Modem[];
@@ -108,7 +112,7 @@ export interface MyModems {
 export interface RenewalOption {
   period: ModemPeriod;
   days: number;
-  priceUsd: number;
+  priceUsd: number | null;
   available: boolean;
   reason: string | null;
   extendsTo: string | null;
@@ -117,7 +121,7 @@ export interface RenewalOption {
 export interface RenewalQuote {
   defaultPeriod: ModemPeriod;
   days: number;
-  priceUsd: number;
+  priceUsd: number | null;
   options: RenewalOption[];
 }
 

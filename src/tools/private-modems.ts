@@ -20,6 +20,7 @@ const PERIODS = ['day', 'week', 'month'] as const;
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const ID_RULE = 'letters, digits, _ or - (1-64 characters)';
 
+const SHARE = ['all', 'some', 'none'];
 const tariffId = { type: 'string', description: 'Plan id from proxies_modem_catalog' };
 const modemId = { type: 'string', description: 'Modem id from proxies_modem_mine' };
 const idempotencyKey = {
@@ -45,10 +46,10 @@ const orderSchema = {
     modemId: { type: ['string', 'null'] },
     countryName: { type: 'string' },
     carrierName: { type: 'string' },
-    period: { type: 'string', enum: PERIODS },
+    period: { type: 'string', description: 'day, week or month' },
     quantity: { type: 'number' },
     regionName: { type: ['string', 'null'] },
-    createdAt: { type: 'string' },
+    createdAt: { type: ['string', 'null'] },
     error: { type: ['string', 'null'] },
     refunded: { type: 'boolean' },
   },
@@ -98,10 +99,10 @@ export const privateModemToolDefinitions = [
               carrierName: { type: 'string' },
               stock: { type: 'number' },
               priceUsd: { type: 'number' },
-              openvpn: { type: 'boolean' },
-              p0f: { type: 'boolean' },
+              openvpn: { type: 'string', enum: SHARE, description: 'How many modems of the plan offer OpenVPN' },
+              p0f: { type: 'string', enum: SHARE, description: 'How many modems of the plan offer p0f (OS fingerprint)' },
               p0fStock: { type: 'number' },
-              regions: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, stock: { type: 'number' }, p0f: { type: 'boolean' } } } },
+              regions: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, stock: { type: 'number' }, p0f: { type: 'number', description: 'Modems in this region with p0f' } } } },
             },
             required: ['tariffId', 'period', 'countryCode', 'countryName', 'carrierName', 'stock', 'priceUsd'],
           },
@@ -125,13 +126,13 @@ export const privateModemToolDefinitions = [
       properties: {
         tariffId: { type: ['string', 'null'] },
         modemId: { type: ['string', 'null'] },
-        priceUsd: { type: 'number', description: 'Price of the plan, or of the default renewal period' },
+        priceUsd: { type: ['number', 'null'], description: 'Price of the plan, or of the default renewal period (null when that period is not available)' },
         period: { type: 'string', enum: PERIODS },
         stock: { type: ['number', 'null'] },
         options: {
           type: 'array',
           description: 'Renewal periods (modemId only)',
-          items: { type: 'object', properties: { period: { type: 'string', enum: PERIODS }, days: { type: 'number' }, priceUsd: { type: 'number' }, available: { type: 'boolean' }, reason: { type: ['string', 'null'] }, extendsTo: { type: ['string', 'null'] } } },
+          items: { type: 'object', properties: { period: { type: 'string', enum: PERIODS }, days: { type: 'number' }, priceUsd: { type: ['number', 'null'] }, available: { type: 'boolean' }, reason: { type: ['string', 'null'] }, extendsTo: { type: ['string', 'null'] } } },
         },
         next: { type: 'string' },
       },
@@ -202,7 +203,7 @@ export const privateModemToolDefinitions = [
     outputSchema: {
       type: 'object',
       properties: {
-        liveError: { type: ['string', 'null'] },
+        liveError: { type: 'boolean', description: 'true when live credentials could not be read this time' },
         openOrders: { type: 'array', items: orderSchema },
         recentFailed: { type: 'array', items: orderSchema },
         modems: {
@@ -215,14 +216,14 @@ export const privateModemToolDefinitions = [
               countryCode: { type: 'string' },
               countryName: { type: 'string' },
               carrierName: { type: 'string' },
-              period: { type: 'string', enum: PERIODS },
-              expiresAt: { type: 'string' },
-              online: { type: 'boolean' },
+              period: { type: 'string', description: 'day, week or month' },
+              expiresAt: { type: ['string', 'null'] },
+              online: { type: ['boolean', 'null'] },
               currentIp: { type: ['string', 'null'] },
-              credentials: { type: 'object' },
+              credentials: { type: ['object', 'null'], description: 'null while setting up, or once expired' },
               autoRenew: { type: 'boolean' },
             },
-            required: ['id', 'status', 'countryCode', 'expiresAt', 'online', 'credentials'],
+            required: ['id', 'status', 'countryCode'],
           },
         },
       },
@@ -265,7 +266,7 @@ export function createPrivateModemToolHandlers(api: ProxiesApi) {
           stock: null,
           options: quote.options,
           next: `Confirm the USD price of the chosen period with the user, then call proxies_modem_renew with that period, expectedPriceUsd and confirm: true.`,
-        }, `Renewal of modem ${args.modemId}: ${quote.priceUsd.toFixed(2)} USD for ${quote.days} day(s) (${quote.defaultPeriod}).`);
+        }, `Renewal of modem ${args.modemId}: ${quote.options.filter(option => option.available).map(option => `${option.period} ${option.priceUsd} USD`).join(', ')} (default ${quote.defaultPeriod}).`);
       }
 
       const catalog = await api.privateModems.getCatalog();
