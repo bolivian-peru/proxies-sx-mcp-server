@@ -1,0 +1,15 @@
+{
+  "name": "proxies-sx",
+  "description": "Proxies.sx plugins for Claude Code",
+  "owner": {
+    "name": "Proxies.sx",
+    "url": "https://proxies.sx"
+  },
+  "plugins": [
+    {
+      "name": "proxies-sx",
+      "source": "./",
+      "description": "Residential and mobile proxies for AI agents: proxy URLs, live stock, IP rotation, Private modems"
+    }
+  ]
+}

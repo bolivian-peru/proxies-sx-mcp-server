@@ -1,0 +1,23 @@
+{
+  "name": "proxies-sx",
+  "displayName": "Proxies.sx",
+  "version": "3.1.0",
+  "description": "Residential and mobile proxies for AI agents: Pool Gateway proxy URLs, live stock per country, IP rotation, Private modems, usage, billing and support, through the @proxies-sx/mcp-server MCP server.",
+  "author": {
+    "name": "Proxies.sx",
+    "url": "https://proxies.sx"
+  },
+  "homepage": "https://agents.proxies.sx/",
+  "repository": "https://github.com/bolivian-peru/proxies-sx-mcp-server",
+  "license": "MIT",
+  "keywords": ["mcp", "proxy", "residential-proxy", "mobile-proxy", "rotating-proxy", "socks5", "web-scraping", "x402"],
+  "mcpServers": {
+    "proxies-sx": {
+      "command": "npx",
+      "args": ["-y", "@proxies-sx/mcp-server"],
+      "env": {
+        "PROXIES_API_KEY": "${PROXIES_API_KEY:-}"
+      }
+    }
+  }
+}
