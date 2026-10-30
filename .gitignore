@@ -68,3 +68,6 @@ temp/
 yarn.lock
 pnpm-lock.yaml
 bun.lockb
+
+# MCP registry publisher tokens
+.mcpregistry_*_token

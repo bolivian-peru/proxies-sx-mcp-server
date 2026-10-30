@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Claude Code plugin: `.claude-plugin/marketplace.json` and `plugin.json` make the repository a one-plugin marketplace (`/plugin marketplace add bolivian-peru/proxies-sx-mcp-server`, then `/plugin install proxies-sx@proxies-sx`). The plugin starts `npx -y @proxies-sx/mcp-server` with `PROXIES_API_KEY` from the environment and loads `SKILL.md` as its skill. The npm package is unchanged.
+- Claude Code plugin: `.claude-plugin/marketplace.json` and `plugin.json` make the repository a one-plugin marketplace (`/plugin marketplace add bolivian-peru/proxies-sx-mcp-server`, then `/plugin install proxies-sx@proxies-sx`). The plugin starts the pinned `npx -y @proxies-sx/mcp-server@3.1.0`, asks for `PROXIES_API_KEY` as a sensitive userConfig value, carries the directory icon and policy links, and loads `SKILL.md` as its skill. The npm package is unchanged.
 
 ## 3.1.0 (2026-10-28)
 

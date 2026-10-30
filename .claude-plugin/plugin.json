@@ -10,14 +10,39 @@
   "homepage": "https://agents.proxies.sx/",
   "repository": "https://github.com/bolivian-peru/proxies-sx-mcp-server",
   "license": "MIT",
-  "keywords": ["mcp", "proxy", "residential-proxy", "mobile-proxy", "rotating-proxy", "socks5", "web-scraping", "x402"],
+  "keywords": [
+    "mcp",
+    "proxy",
+    "residential-proxy",
+    "mobile-proxy",
+    "rotating-proxy",
+    "socks5",
+    "web-scraping",
+    "x402"
+  ],
   "mcpServers": {
     "proxies-sx": {
       "command": "npx",
-      "args": ["-y", "@proxies-sx/mcp-server"],
+      "args": [
+        "-y",
+        "@proxies-sx/mcp-server@3.1.0"
+      ],
       "env": {
-        "PROXIES_API_KEY": "${PROXIES_API_KEY:-}"
+        "PROXIES_API_KEY": "${user_config.PROXIES_API_KEY}"
       }
     }
-  }
+  },
+  "userConfig": {
+    "PROXIES_API_KEY": {
+      "type": "string",
+      "title": "Proxies.sx API key",
+      "description": "psx_ key from https://client.proxies.sx/account. Leave empty only for x402 wallet mode.",
+      "sensitive": true
+    }
+  },
+  "icon": "./.claude-plugin/icon.png",
+  "documentationUrl": "https://agents.proxies.sx/mcp/",
+  "supportUrl": "https://client.proxies.sx/tickets",
+  "privacyPolicyUrl": "https://www.proxies.sx/privacy",
+  "termsOfServiceUrl": "https://www.proxies.sx/terms"
 }

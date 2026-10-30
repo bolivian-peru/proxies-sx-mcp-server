@@ -19,7 +19,7 @@ Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`), so a cli
 claude mcp add proxies-sx -e PROXIES_API_KEY=psx_your_api_key_here -- npx -y @proxies-sx/mcp-server
 ```
 
-   Or install it as a Claude Code plugin, which adds the same server plus the Proxies.sx skill and reads `PROXIES_API_KEY` from your environment:
+   Or install it as a Claude Code plugin, which adds the same server plus the Proxies.sx skill and asks for your API key once (stored masked in secure storage):
 
 ```
 /plugin marketplace add bolivian-peru/proxies-sx-mcp-server
