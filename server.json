@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bolivian-peru/proxies-sx-mcp-server",
-  "description": "Residential and mobile proxies for AI agents: rotating/sticky proxy URLs, live stock, IP rotation.",
-  "version": "3.0.1",
+  "description": "Residential and mobile proxies and Private modems for AI agents: proxy URLs, stock, rotation, top-up",
+  "version": "3.1.0",
   "websiteUrl": "https://agents.proxies.sx/mcp/",
   "repository": {
     "url": "https://github.com/bolivian-peru/proxies-sx-mcp-server",
@@ -13,16 +13,39 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@proxies-sx/mcp-server",
-      "version": "3.0.1",
+      "version": "3.1.0",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
           "name": "PROXIES_API_KEY",
-          "description": "psx_ API key created at client.proxies.sx/account (standard mode). Optional when using x402 wallet mode.",
+          "description": "psx_ API key created at client.proxies.sx/account (standard mode). Tick the modems:purchase and billing:topup scopes for the modem and top-up tools. Optional when using x402 wallet mode.",
           "isRequired": false,
           "isSecret": true
+        },
+        {
+          "name": "PROXIES_EMAIL",
+          "description": "Account email, an alternative to PROXIES_API_KEY together with PROXIES_PASSWORD.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "PROXIES_PASSWORD",
+          "description": "Account password, used with PROXIES_EMAIL instead of an API key.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "PROXIES_TOOLSET",
+          "description": "default lists about 20 tools grouped by buy / use / manage; full lists every API-key tool. Same as the --toolset=full argument.",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "default",
+          "choices": [
+            "default",
+            "full"
+          ]
         },
         {
           "name": "AGENT_WALLET_KEY",
@@ -31,11 +54,32 @@
           "isSecret": true
         },
         {
+          "name": "BASE_RPC_URL",
+          "description": "Custom Base RPC endpoint for the x402 wallet mode.",
+          "isRequired": false,
+          "isSecret": false,
+          "default": "https://mainnet.base.org"
+        },
+        {
           "name": "PROXIES_API_URL",
           "description": "API base URL. A trailing /v1 is accepted. Leave unset unless you run a private API.",
           "isRequired": false,
           "isSecret": false,
           "default": "https://api.proxies.sx"
+        }
+      ],
+      "packageArguments": [
+        {
+          "type": "named",
+          "name": "--toolset",
+          "description": "default (about 20 tools) or full (every API-key tool)",
+          "isRequired": false,
+          "default": "default",
+          "choices": [
+            "default",
+            "full"
+          ],
+          "valueHint": "full"
         }
       ]
     }

@@ -1,7 +1,7 @@
 /**
  * MCP tool annotations (spec 2025-03-26 `ToolAnnotations`).
- * Three factories cover every tool: read-only lookups, ordinary mutations,
- * and destructive mutations (delete / revoke / cancel / rotate). API tools
+ * Four factories cover every tool: read-only lookups, ordinary mutations,
+ * destructive mutations (delete / revoke / cancel / rotate) and spending. API tools
  * talk only to the Proxies.sx API, so openWorldHint is false; the wallet
  * tools that read or pay on a public blockchain wrap theirs in onChain().
  */
@@ -30,6 +30,9 @@ export const mutating = (title: string, idempotent = false): ToolAnnotations => 
 
 /** delete / revoke / cancel / rotate — irreversible for the caller. */
 export const destructive = (title: string): ToolAnnotations => annotate(title, false, true, false);
+
+/** Spends money from the balance; idempotent when the request carries an Idempotency-Key. */
+export const spending = (title: string, idempotent = false): ToolAnnotations => annotate(title, false, true, idempotent);
 
 /** For wallet tools that read from or pay on a public blockchain. */
 export const onChain = (annotations: ToolAnnotations): ToolAnnotations => ({ ...annotations, openWorldHint: true });

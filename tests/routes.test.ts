@@ -23,6 +23,10 @@ const port = {
 const ticket = { _id: ID, ticketNumber: 'TKT-1', subject: 's', message: 'm', status: 'waiting_customer', category: 'general', priority: 'low', createdAt: '2026-10-08T00:00:00.000Z', replies: [{ message: 'hello', authorType: 'support', createdAt: '2026-10-08T01:00:00.000Z' }] };
 const x402Session = { sessionId: 's1', walletAddress: '0xabc', network: 'base', txHash: '0x1', amountUSDC: 4, tier: 'shared', trafficAllocatedGB: 1, trafficUsedGB: 0, portCount: 1, expiresAt: '2026-10-09T00:00:00.000Z', isActive: true, ports: [] };
 const x402Port = { id: 'p1', displayName: 'p1', http: 'http://u:p@h:1', socks5: 'socks5://u:p@h:2', expiresAt: '2026-10-09T00:00:00.000Z', expiresInSeconds: 7200, rotationUrl: 'https://api.proxies.sx/v1/rotate/t' };
+const KEY = '11111111-2222-4333-8444-555555555555';
+const order = { orderId: 'o1', kind: 'buy', status: 'pending', priceUsd: 12, modemId: null, countryName: 'Germany', carrierName: 'Carrier', period: 'day', quantity: 1, regionName: null, createdAt: 'now', error: null, refunded: false };
+const tariff = { tariffId: 't1', period: 'day', countryCode: 'DE', countryName: 'Germany', carrierId: 'c1', carrierName: 'Carrier', stock: 3, priceUsd: 12, openvpn: true, p0f: false, p0fStock: 0, regions: [] };
+const modem = { id: 'm1', status: 'active', countryCode: 'DE', countryName: 'Germany', carrierName: 'Carrier', period: 'day', regionName: null, expiresAt: 'later', online: true, notAnswering: false, currentIp: '203.0.113.7', rotationInterval: null, credentials: { http: { host: 'modem.example.net', port: 10001, username: 'u', password: 'p' }, socks5: null }, capabilities: {}, rotationToken: null, autoRenew: false, autoRenewIssue: null, autoRenewPeriod: null };
 const stock = { pools: { mbl: { us: 2 }, peer: { us: 5, de: 3 } }, totals: { mbl: 2, peer: 8, all: 10 }, ipTypes: { peer: { us: { mobile: 1, residential: 4, datacenter: 7, unclassified: 0 } }, totals: { mobile: 1, residential: 7, datacenter: 7, unclassified: 0 } }, generatedAt: 'now', stale: false };
 
 /** [tool, arguments, expected requests in order, fixture per request (default {}), expected text] */
@@ -115,6 +119,19 @@ const cases: Case[] = [
   ['pool_delete_key', { keyId: 'k1' }, ['DELETE /v1/reseller/pool-keys/k1']],
   ['pool_key_usage', { keyId: 'k1', days: 7 }, ['GET /v1/reseller/pool-keys/k1/usage?days=7']],
   ['pool_key_audit', { keyId: 'k1' }, ['GET /v1/reseller/pool-keys/k1/audit']],
+  // Private modems (buy and renew carry an Idempotency-Key; the body never names a supplier)
+  ['proxies_modem_catalog', { country: 'de' }, ['GET /v1/private-modems/catalog'], [{ maxCartModems: 5, tariffs: [tariff, { ...tariff, tariffId: 't2', countryCode: 'GB' }] }], /1 plan\(s\)[\s\S]*"tariffId": "t1"(?![\s\S]*"t2")/],
+  ['proxies_modem_quote', { tariffId: 't1' }, ['GET /v1/private-modems/catalog'], [{ maxCartModems: 5, tariffs: [tariff] }], /12\.00 USD per modem, 3 in stock[\s\S]*"priceUsd": 12/],
+  ['proxies_modem_quote', { modemId: 'm1' }, ['GET /v1/private-modems/m1/renewal-quote'], [{ defaultPeriod: 'week', days: 7, priceUsd: 40, options: [{ period: 'week', days: 7, priceUsd: 40, available: true, reason: null, extendsTo: 'later' }] }], /week 40 USD \(default week\)/],
+  ['proxies_modem_buy', { tariffId: 't1', expectedPriceUsd: 12, confirm: true, idempotencyKey: KEY }, ['POST /v1/private-modems/orders {"tariffId":"t1","expectedPriceUsd":12} [Idempotency-Key]'], [order], new RegExp(`Idempotency-Key used: ${KEY}[\\s\\S]*proxies_modem_mine`)],
+  ['proxies_modem_buy', { tariffId: 't1', expectedPriceUsd: 12, confirm: true, idempotencyKey: KEY, quantity: 2, confirmAgain: true }, ['POST /v1/private-modems/orders {"items":[{"tariffId":"t1","quantity":2,"expectedPriceUsd":12}],"confirmAgain":true} [Idempotency-Key]'], [{ cartId: 'cart1', orders: [{ ...order, quantity: 2 }] }], /24\.00 USD/],
+  ['proxies_modem_buy', { tariffId: 't1', expectedPriceUsd: 12, confirm: true, idempotencyKey: KEY, p0f: true }, ['POST /v1/private-modems/orders {"items":[{"tariffId":"t1","quantity":1,"expectedPriceUsd":12,"p0f":true}]} [Idempotency-Key]'], [{ cartId: 'cart1', orders: [{ ...order, status: 'failed', error: 'no_stock' }] }], /Failed: no_stock[\s\S]*new idempotencyKey/],
+  ['proxies_modem_renew', { modemId: 'm1', expectedPriceUsd: 40, period: 'week', confirm: true, idempotencyKey: KEY }, ['POST /v1/private-modems/m1/renew {"expectedPriceUsd":40,"period":"week"} [Idempotency-Key]'], [{ ...order, kind: 'renew', priceUsd: 40 }], /"kind": "renew"/],
+  ['proxies_modem_rotate', { modemId: 'm1' }, ['POST /v1/private-modems/m1/rotate'], [{ rotated: true, pending: false, message: 'Rotated' }], /^Rotated\n/],
+  ['proxies_modem_mine', {}, ['GET /v1/private-modems/mine'], [{ liveError: null, openOrders: [], recentFailed: [], modems: [modem] }], /1 modem\(s\), 0 open order\(s\)[\s\S]*keep it private[\s\S]*"host": "modem\.example\.net"/],
+  // Card top-up
+  ['proxies_topup_checkout', { amountUsd: 20, confirm: true }, ['POST /v1/stripe/create-balance-checkout {"amount":20}'], [{ url: 'https://checkout.stripe.com/c/pay/cs_1', sessionId: 'cs_1' }], /A person must open the url[\s\S]*"url": "https:\/\/checkout\.stripe\.com\/c\/pay\/cs_1",\s+"sessionId": "cs_1"/],
+  ['proxies_topup_status', { sessionId: 'cs_1' }, ['GET /v1/stripe/balance-checkout/cs_1/receipt'], [{ credited: true }], /credited: read it with get_account_summary/],
   // Private Pool and Reserved IPs
   ['private_pool_list', {}, ['GET /v1/private-pool/pools'], [[]]],
   ['private_pool_build', { countries: ['us'] }, ['POST /v1/private-pool/build-from-balance {"countries":["US"],"deviceCount":1,"dedicateGB":1}']],
@@ -153,15 +170,18 @@ describe('API tool routes', () => {
   const handlers = createAllToolHandlers(createProxiesApi({ baseUrl: BASE, token: 'psx_test' }), BASE);
 
   it('covers every API-key tool', () => {
-    expect([...cases.map(c => c[0]), ...LOCAL_TOOLS].sort()).toEqual(allToolDefinitions.map(t => t.name).sort());
+    expect([...new Set([...cases.map(c => c[0]), ...LOCAL_TOOLS])].sort()).toEqual(allToolDefinitions.map(t => t.name).sort());
   });
 
-  it.each(cases)('%s', async (tool, args, requests, fixtures, output) => {
+  it.each(cases)('%s %j', async (tool, args, requests, fixtures, output) => {
     const seen = stubFetch(fixtures);
-    const text = await handlers[tool](args);
+    const result = await handlers[tool](args);
+    const text = typeof result === 'string' ? result : result.text;
     expect(seen).toEqual(requests);
     expect(text).not.toMatch(/undefined|\[object Object\]|NaN/);
     if (output) expect(text).toMatch(output);
+    // A structured result is mirrored in its text
+    if (typeof result !== 'string') expect(text).toContain(JSON.stringify(result.structuredContent, null, 2));
   });
 
   it.each(LOCAL_TOOLS)('%s makes no request', async (tool) => {

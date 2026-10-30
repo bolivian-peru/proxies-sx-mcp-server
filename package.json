@@ -1,6 +1,6 @@
 {
   "name": "@proxies-sx/mcp-server",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "MCP server for residential and mobile proxies: AI agents get rotating and sticky proxy URLs (HTTP/SOCKS5), live stock per country, IP rotation, usage and billing. Proxies.sx Pool Gateway, metered per GB.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

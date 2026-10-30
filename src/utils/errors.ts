@@ -148,3 +148,26 @@ export function explainError(message: string, statusCode?: number): string {
   const hint = statusCode ? statusHint(statusCode, safe) : null;
   return hint ? `${safe}\n${HINT_MARKER} ${hint}` : safe;
 }
+
+/**
+ * Error body of the Proxies.sx API. The purchase routes (private modems,
+ * balance top-up) add a stable `code` and a one-sentence `fix`; class-validator
+ * answers with an array of messages.
+ */
+export interface ApiErrorBody {
+  message?: string | string[];
+  code?: string;
+  fix?: string;
+}
+
+/**
+ * Explain an API error body. The API's own `fix` wins over the generic status
+ * hint, and the `code` is kept in the text so an agent can branch on it.
+ */
+export function explainApiError(body: ApiErrorBody, statusCode: number, statusText = ''): string {
+  const raw = body.message;
+  const message = (Array.isArray(raw) ? raw.join('; ') : raw) || `HTTP ${statusCode}: ${statusText}`;
+  const withCode = body.code ? `${message} [${body.code}]` : message;
+  if (body.fix) return `${redactSecrets(withCode)}\n${HINT_MARKER} ${body.fix}`;
+  return explainError(withCode, statusCode);
+}

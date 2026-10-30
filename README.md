@@ -6,9 +6,9 @@
 
 MCP (Model Context Protocol) server for [Proxies.sx](https://proxies.sx): [residential and mobile proxies](https://agents.proxies.sx/pool/) for AI agents, metered per GB. Claude, Cursor and any MCP client can get rotating or sticky HTTP/SOCKS5 proxy URLs, check live stock per country, rotate IPs and manage usage by themselves, for web scraping, data collection and browser automation.
 
-The main product is the **Pool Gateway**: one endpoint, `gw.proxies.sx` (HTTP `7000`, SOCKS5 `7001`), where the proxy username says which pool, country and session you want. With this server an agent reads live stock, gets its credentials, builds the proxy URL, watches usage and opens a support ticket when something is wrong. It can also manage dedicated ports on carrier modems, Private Pools and Reserved IPs.
+The main product is the **Pool Gateway**: one endpoint, `gw.proxies.sx` (HTTP `7000`, SOCKS5 `7001`), where the proxy username says which pool, country and session you want. With this server an agent reads live stock, gets its credentials, builds the proxy URL, watches usage and opens a support ticket when something is wrong. For a dedicated, unlimited-traffic device it rents a **Private modem** (one 4G/5G modem, by the day, week or month) and tops up the balance by card through a link a person pays. It can also manage dedicated ports on carrier modems, Private Pools and Reserved IPs.
 
-Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`), so a client can ask before a delete, rotate or cancel.
+Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`), so a client can ask before a delete, rotate, cancel or purchase. The tools that spend money do nothing until the agent passes `confirm: true`, which it sets only after the user agreed to the exact USD amount.
 
 ## Quick start
 
@@ -27,7 +27,7 @@ The agent calls `pool_get_stock`, `pool_get_my_credentials` and `pool_build_prox
 
 ### API key scopes
 
-A customer key can hold: `ports:read`, `ports:write`, `ports:rotate`, `billing:read`, `account:read`, `account:write`, `traffic:read`, `tickets:read`, `tickets:write`. Select all of them for the full customer tool set.
+A customer key can hold: `ports:read`, `ports:write`, `ports:rotate`, `billing:read`, `account:read`, `account:write`, `traffic:read`, `tickets:read`, `tickets:write`. Select all of them for the full customer tool set. Two opt-in scopes are never in the default set and must be ticked on purpose: `modems:purchase` (`proxies_modem_buy`, `proxies_modem_renew`) and `billing:topup` (`proxies_topup_checkout`, `proxies_topup_status`; each key has a daily top-up cap, `spendCapUsdPerDay`, default 100 USD, set in the dashboard).
 
 - `billing:write` is not available to customer keys. The tools that need it (`purchase_shared_traffic`, `create_crypto_payment`, `cancel_crypto_payment`) work with reseller and admin keys only; a customer buys traffic in the dashboard.
 - The `pak_` key tools (`pool_mint_key` and the other `pool_*_key` tools) need a reseller account, whose keys hold `customers:read` and `customers:write`.
@@ -71,9 +71,21 @@ A tool that fails returns an MCP error result (`isError: true`) whose text ends 
 
 | Mode | Set | Tools |
 |---|---|---|
-| **API key** (standard) | `PROXIES_API_KEY` | every tool below except the x402 wallet group |
+| **API key** (standard) | `PROXIES_API_KEY` | the default toolset (20 tools), or every API-key tool with `--toolset=full` |
 | **x402 wallet** (optional) | `AGENT_WALLET_KEY` | the x402 wallet group plus the tools marked "also listed in wallet mode" |
-| **Both** | both variables | everything |
+| **Both** | both variables | both of the above |
+
+### Toolsets
+
+By default the server lists **20 tools**, grouped by what an agent does: **buy** (`proxies_modem_catalog`, `proxies_modem_quote`, `proxies_modem_buy`, `proxies_modem_renew`, `proxies_topup_checkout`, `proxies_topup_status`, `get_pricing`), **use** (`pool_get_stock`, `pool_get_my_credentials`, `pool_build_proxy_url`, `pool_explain_error`, `proxies_modem_mine`, `proxies_modem_rotate`) and **manage** (`get_account_summary`, `get_account_usage`, `pool_set_proxy_password`, `get_service_status`, `create_support_ticket`, `list_my_tickets`, `get_ticket`). Fewer tools in the list means a client picks the right one more often.
+
+Everything else (dedicated ports, Private Pools and Reserved IPs, crypto orders, coupons, `pak_` keys, x402 session management, ops) is listed with the **full** toolset:
+
+```bash
+npx -y @proxies-sx/mcp-server --toolset=full      # or PROXIES_TOOLSET=full in the environment
+```
+
+The wallet tools are not affected by the toolset: they are always listed when `AGENT_WALLET_KEY` is set. The tool tables below mark the default tools.
 
 | Variable | Description |
 |---|---|
@@ -82,6 +94,7 @@ A tool that fails returns an MCP error result (`isError: true`) whose text ends 
 | `AGENT_WALLET_KEY` | Private key (`0x...`) of a USDC wallet on the Base network, for x402 payments without an account |
 | `BASE_RPC_URL` | Custom Base RPC endpoint, for x402 (default `https://mainnet.base.org`) |
 | `PROXIES_API_URL` | API base URL. Default `https://api.proxies.sx`; a trailing `/v1` is accepted and ignored. Leave it unset unless you run a private API. |
+| `PROXIES_TOOLSET` | `default` (20 tools) or `full` (every API-key tool). The `--toolset=full` argument does the same. |
 
 ## Usage with MCP clients
 
@@ -137,22 +150,35 @@ The container speaks MCP over stdio (`-i` is required).
 ## Tools
 
 <!-- tools:start -->
-Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edit by hand.
+Generated from the code of version 3.1.0 by `npm run build:manifest`. Do not edit by hand.
+
+The 20 tools marked "Default" are listed without a flag; the others need `--toolset=full` (or `PROXIES_TOOLSET=full`). Wallet tools are always listed when a wallet is set.
 
 **Pool Gateway**
 
 | Tool | What it does |
 |---|---|
-| `pool_get_stock` | Get live Pool Gateway stock, no account needed. Also listed in wallet mode. |
+| `pool_get_stock` | Get live Pool Gateway stock, no account needed. Default. Also listed in wallet mode. |
 | `pool_get_facets` | List the cities, states, carriers (with ASN and class) and IP classes that have stock in one country, with counts, no account needed. Also listed in wallet mode. |
-| `pool_build_proxy_url` | Build a ready-to-use Pool Gateway proxy URL (gw.proxies.sx, HTTP 7000 or SOCKS5 7001). Also listed in wallet mode. |
-| `pool_explain_error` | Explain a Pool Gateway error and say what to do about it. Also listed in wallet mode. |
-| `pool_get_my_credentials` | Get your Pool Gateway proxy username and proxy password with ready HTTP and SOCKS5 URLs. |
-| `pool_set_proxy_password` | Set a new proxy password (at least 6 characters). |
+| `pool_build_proxy_url` | Build a ready-to-use Pool Gateway proxy URL (gw.proxies.sx, HTTP 7000 or SOCKS5 7001). Default. Also listed in wallet mode. |
+| `pool_explain_error` | Explain a Pool Gateway error and say what to do about it. Default. Also listed in wallet mode. |
+| `pool_get_my_credentials` | Get your Pool Gateway proxy username and proxy password with ready HTTP and SOCKS5 URLs. Default. |
+| `pool_set_proxy_password` | Set a new proxy password (at least 6 characters). Default. |
 | `pool_get_my_stats` | Get your own Pool Gateway traffic and open connections, plus the health score of the pool and how many devices are connected to it. |
 | `pool_list_sessions` | List your saved Pool Gateway sessions: pool, country, carrier, rotation mode, bytes and last activity. |
 | `pool_close_session` | Close one Pool Gateway session by the sessionKey from pool_list_sessions. |
 | `pool_close_all_sessions` | Close every saved Pool Gateway session of the account. |
+
+**Private modems**
+
+| Tool | What it does |
+|---|---|
+| `proxies_modem_catalog` | List the Private modem plans for sale right now: country, carrier, period (day, week or month), price in USD, stock, OpenVPN and p0f support, regions. Default. |
+| `proxies_modem_quote` | Price check before spending. Default. |
+| `proxies_modem_buy` | Rent a Private modem (one dedicated 4G/5G modem, unlimited traffic) from the account balance. Default. |
+| `proxies_modem_renew` | Extend the rental of one of your Private modems from the account balance. Default. |
+| `proxies_modem_rotate` | Ask one of your Private modems for a new IP address. Default. |
+| `proxies_modem_mine` | List your rented Private modems: status, expiry, online state, HTTP and SOCKS5 credentials, rotation settings, auto-renew, plus open orders and recent failures. Default. |
 
 **Private Pool and Reserved IPs**
 
@@ -173,14 +199,14 @@ Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edi
 
 | Tool | What it does |
 |---|---|
-| `get_account_summary` | Get the account balance, free port slots, traffic bought and left, and any account alerts. |
-| `get_account_usage` | Get traffic purchased, used and still available, split into Pool Gateway traffic and dedicated-port traffic. |
+| `get_account_summary` | Get the account balance, free port slots, traffic bought and left, and any account alerts. Default. |
+| `get_account_usage` | Get traffic purchased, used and still available, split into Pool Gateway traffic and dedicated-port traffic. Default. |
 
 **Billing**
 
 | Tool | What it does |
 |---|---|
-| `get_pricing` | Get the live price per GB, the volume discounts, the free port-slot tiers and your current tier. |
+| `get_pricing` | Get the live price per GB, the volume discounts, the free port-slot tiers and your current tier. Default. |
 | `calculate_price` | Calculate what a GB amount costs with the volume discount applied. |
 | `purchase_shared_traffic` | Buy traffic in GB from the account balance. |
 | `coupon_validate` | Check whether a coupon code is valid for an order, without using it. |
@@ -191,6 +217,8 @@ Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edi
 
 | Tool | What it does |
 |---|---|
+| `proxies_topup_checkout` | Add money to the account balance by card: creates a Stripe Checkout page and returns its url and sessionId. Default. |
+| `proxies_topup_status` | Check whether a card top-up started with proxies_topup_checkout was paid and credited to the balance (credited true or false). Default. |
 | `create_crypto_payment` | Create a crypto order that tops up the account balance and return its hosted payment link. |
 | `check_crypto_payment_status` | Check whether a crypto order is still unpaid, confirming, paid, expired or cancelled, and whether the balance was credited. |
 | `get_pending_crypto_payments` | List the account's crypto orders that are not finished yet, with their payment links. |
@@ -236,16 +264,16 @@ Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edi
 |---|---|
 | `get_proxy_connection_string` | Build the HTTP or SOCKS5 connection string of a dedicated port (contains the port password). |
 | `get_all_proxy_formats` | Get a dedicated port in every common format: URLs, host:port, environment variables, curl, Python and Node.js snippets, and its public rotation link. |
-| `get_service_status` | Check whether Proxies.sx is healthy right now: open Pool Gateway incidents, the state of the API, gateway and relay, and recent uptime. Also listed in wallet mode. |
+| `get_service_status` | Check whether Proxies.sx is healthy right now: open Pool Gateway incidents, the state of the API, gateway and relay, and recent uptime. Default. Also listed in wallet mode. |
 | `get_os_fingerprint_options` | List the OS fingerprint values create_port and update_os_fingerprint accept. |
 
 **Support**
 
 | Tool | What it does |
 |---|---|
-| `create_support_ticket` | Open a support ticket that a person at Proxies.sx reads and answers. |
-| `list_my_tickets` | List your support tickets with their status and IDs. |
-| `get_ticket` | Get one support ticket with the original message and every reply. |
+| `create_support_ticket` | Open a support ticket that a person at Proxies.sx reads and answers. Default. |
+| `list_my_tickets` | List your support tickets with their status and IDs. Default. |
+| `get_ticket` | Get one support ticket with the original message and every reply. Default. |
 | `reply_to_ticket` | Add a reply to one of your support tickets. |
 | `close_ticket` | Close one of your support tickets once the problem is solved. |
 
@@ -316,6 +344,22 @@ Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edi
 
 [`tools.json`](./tools.json) carries the same list in machine-readable form (name, category, title, first sentence of the description, read-only and destructive flags, mode, parameters).
 
+## Private modems
+
+A Private modem is one dedicated 4G/5G modem rented whole, by the day, week or month, with unlimited traffic, paid from the account balance. It is the first answer to a request for a dedicated, unlimited, exclusive-device, p0f or OpenVPN proxy; per-GB traffic stays on the Pool Gateway.
+
+```
+1. proxies_modem_catalog {country: "de"}            -> plans with carrier, period, price in USD, stock
+2. proxies_modem_quote {tariffId}                   -> the current price; show it to the user
+3. proxies_modem_buy {tariffId, expectedPriceUsd, confirm: true}   -> order; returns the Idempotency-Key it used
+4. proxies_modem_mine                               -> credentials once the order succeeded (10-60 s)
+5. proxies_modem_rotate {modemId}                   -> new IP;  proxies_modem_quote {modemId} + proxies_modem_renew to extend
+```
+
+- Buy and renew need the price the user saw as `expectedPriceUsd`; the API refuses a stale price with `price_changed`. They send an `Idempotency-Key` and return it: retry a failed call with the same `idempotencyKey` and you get the same order, never a second charge. After `insufficient_balance` nothing is charged; top up, then order again with a new key.
+- When the balance is short, `proxies_topup_checkout {amountUsd, confirm: true}` returns a Stripe Checkout `url` that a person opens and pays by card (the agent cannot pay it); `proxies_topup_status {sessionId}` says when the balance is credited.
+- The modem's exit IP appears in `proxies_modem_mine` for its owner only. Do not publish it.
+
 ## Dedicated ports
 
 A dedicated port binds one port to one carrier modem. Modems exist only in US, GB, FR, NL, PL and GE (Georgia); `list_available_countries` shows where a modem is free right now. For every other country use the Pool Gateway.
@@ -359,7 +403,9 @@ Devices that share their connection through the peer SDK are paid per GB served.
 
 - **"Authentication required" at start.** Neither `PROXIES_API_KEY` nor `AGENT_WALLET_KEY` is set in the environment the client starts the server with.
 - **Every tool answers 401.** The key is wrong, expired or revoked. Create a new one at [client.proxies.sx/account](https://client.proxies.sx/account).
-- **A tool answers 403 "missing required scope".** Create a key that includes that scope. `billing:write` and `customers:*` cannot be given to a customer key (see above).
+- **A tool answers 403 "missing required scope".** Create a key that includes that scope. `billing:write` and `customers:*` cannot be given to a customer key (see above). `modems:purchase` and `billing:topup` are opt-in: tick them when creating the key.
+- **A purchase tool answers with a code** such as `price_changed`, `no_stock`, `insufficient_balance` or `spend_cap_reached`. The `What to do:` line is the API's own fix for that code; follow it rather than retrying the same call.
+- **`proxies_modem_buy` answers "confirm is not true".** Nothing was bought. Show the user the USD price from `proxies_modem_quote` and call again with `confirm: true` once they agree.
 - **The proxy answers 407.** Read the error code: `E_AUTH_INVALID` is a wrong proxy password (use `pool_get_my_credentials`), `E_BALANCE_EXHAUSTED` is an empty balance (use `get_account_usage`).
 - **The proxy answers 502 `E_NO_STOCK_COUNTRY`.** Nothing is online for that pool, country and filters: check `pool_get_stock` and `pool_get_facets`, and remember that `mbl` exists in six countries only.
 - **Claude Desktop does not show the server.** Check the JSON syntax of the config file, make sure Node.js 18 or newer is installed, and restart the app completely.

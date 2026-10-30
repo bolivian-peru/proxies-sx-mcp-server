@@ -18,7 +18,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { createProxiesApi, getAuthToken } from './api/index.js';
-import { allToolDefinitions, allSchemas, createAllToolHandlers, PUBLIC_TOOL_NAMES, type ToolHandlers } from './tools/index.js';
+import { allToolDefinitions, allSchemas, createAllToolHandlers, DEFAULT_TOOL_NAMES, PUBLIC_TOOL_NAMES, type ToolHandlers } from './tools/index.js';
 import type { ToolAnnotations } from './tools/annotations.js';
 import { explainError } from './utils/errors.js';
 
@@ -50,12 +50,19 @@ export interface McpServerConfig {
   // x402 wallet authentication (Mode 2): a wallet on the Base network
   walletPrivateKey?: string;
   baseRpcUrl?: string;
+
+  /** Which API-key tools to list: the default ~20 (DEFAULT_TOOL_NAMES) or all of them */
+  toolset?: Toolset;
 }
+
+export type Toolset = 'default' | 'full';
+const TOOLSETS: readonly Toolset[] = ['default', 'full'];
 
 interface RegisteredTool {
   name: string;
   description: string;
   inputSchema: object;
+  outputSchema?: object;
   annotations: ToolAnnotations;
 }
 
@@ -72,6 +79,27 @@ const DEFAULT_BASE_URL = 'https://api.proxies.sx';
  */
 export function normalizeBaseUrl(baseUrl?: string): string {
   return (baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '').replace(/\/v1$/, '');
+}
+
+/**
+ * Names of the API-key tools listed for this account and toolset
+ */
+function listedNames(hasAccount: boolean, toolset: Toolset = 'default'): readonly string[] {
+  if (!hasAccount) return PUBLIC_TOOL_NAMES;
+  if (toolset === 'full') return allToolDefinitions.map(tool => tool.name);
+  return DEFAULT_TOOL_NAMES;
+}
+
+/**
+ * Toolset from `--toolset=<name>` on the command line, else PROXIES_TOOLSET
+ */
+export function toolsetFrom(argv: readonly string[], env: NodeJS.ProcessEnv): Toolset {
+  const flag = argv.find(arg => arg.startsWith('--toolset='))?.slice('--toolset='.length);
+  const name = flag ?? env.PROXIES_TOOLSET ?? 'default';
+  if (!TOOLSETS.includes(name as Toolset)) {
+    throw new Error(`Unknown toolset "${name}". Use --toolset=default (about 20 tools) or --toolset=full (every tool); PROXIES_TOOLSET takes the same values.`);
+  }
+  return name as Toolset;
 }
 
 /**
@@ -118,11 +146,10 @@ export async function createMcpServer(config: McpServerConfig) {
     }
   }
 
-  // Without an account only the tools that call public routes are registered
+  // Without an account only the tools that call public routes are registered;
+  // with one, the default toolset unless the full one was asked for
   const api = createProxiesApi({ baseUrl, token: auth?.token, authType: auth?.type });
-  const apiTools: RegisteredTool[] = auth
-    ? allToolDefinitions
-    : allToolDefinitions.filter(tool => PUBLIC_TOOL_NAMES.includes(tool.name));
+  const apiTools: RegisteredTool[] = allToolDefinitions.filter(tool => listedNames(!!auth, config.toolset).includes(tool.name));
 
   let toolHandlers: ToolHandlers = createAllToolHandlers(api, baseUrl);
   let combinedToolDefinitions: RegisteredTool[] = apiTools;
@@ -168,6 +195,7 @@ export async function createMcpServer(config: McpServerConfig) {
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema,
+        outputSchema: tool.outputSchema,
         annotations: tool.annotations,
       })),
     };
@@ -197,16 +225,14 @@ export async function createMcpServer(config: McpServerConfig) {
     }
 
     try {
-      // Execute tool
+      // Execute tool; a structured result is mirrored as text
       const result = await handler(parseResult.data as Record<string, unknown>);
-
+      if (typeof result === 'string') {
+        return { content: [{ type: 'text', text: result }] };
+      }
       return {
-        content: [
-          {
-            type: 'text',
-            text: result,
-          },
-        ],
+        content: [{ type: 'text', text: result.text }],
+        structuredContent: result.structuredContent,
       };
     } catch (error) {
       // The single tool-error path: say what to do, never leak a credential
@@ -288,5 +314,6 @@ export function getConfigFromEnv(): McpServerConfig {
     baseUrl,
     walletPrivateKey,
     baseRpcUrl,
+    toolset: toolsetFrom(process.argv.slice(2), process.env),
   };
 }

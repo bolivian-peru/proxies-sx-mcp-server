@@ -1,6 +1,6 @@
 ---
 name: proxies-sx-mcp-server
-description: Use Proxies.sx residential and mobile proxies from any MCP-compatible AI agent (Claude Desktop, Claude Code, Cursor, Windsurf, Cline, Continue). Trigger this skill when the user wants to install, configure or use the Proxies.sx MCP server, get a proxy URL for the Pool Gateway (gw.proxies.sx), check proxy stock per country, hold a session or an IP, manage dedicated mobile ports, read usage and pricing, open a support ticket, debug an MCP tool or gateway error, or let an agent pay for proxies with USDC (x402). Also when the user mentions "@proxies-sx/mcp-server", "Proxies.sx MCP", "proxy MCP", PROXIES_API_KEY, AGENT_WALLET_KEY, psx_ keys or pak_ keys.
+description: Use Proxies.sx residential and mobile proxies from any MCP-compatible AI agent (Claude Desktop, Claude Code, Cursor, Windsurf, Cline, Continue). Trigger this skill when the user wants to install, configure or use the Proxies.sx MCP server, get a proxy URL for the Pool Gateway (gw.proxies.sx), check proxy stock per country, hold a session or an IP, rent or renew a Private modem (a dedicated 4G/5G modem with unlimited traffic), top up the balance by card, manage dedicated mobile ports, read usage and pricing, open a support ticket, debug an MCP tool or gateway error, or let an agent pay for proxies with USDC (x402). Also when the user mentions "@proxies-sx/mcp-server", "Proxies.sx MCP", "proxy MCP", PROXIES_API_KEY, AGENT_WALLET_KEY, psx_ keys or pak_ keys.
 ---
 
 # Proxies.sx MCP Server
@@ -12,6 +12,7 @@ Source: <https://github.com/bolivian-peru/proxies-sx-mcp-server> · npm: [`@prox
 ## What the product is
 
 - **Pool Gateway** (the main product): one endpoint, `gw.proxies.sx` (HTTP `7000`, SOCKS5 `7001`). The proxy username chooses pool, country, IP class, session and rotation. One proxy password works for every country.
+- **Private modems**: one dedicated 4G/5G modem rented whole, by the day, week or month, unlimited traffic, paid from the account balance. The first answer to any dedicated, unlimited, exclusive-device, p0f or OpenVPN request (`proxies_modem_*` tools).
 - **Dedicated ports**: one port bound to one carrier modem, in the few countries that have modems.
 - **Private Pools and Reserved IPs**: a separate gateway credential scoped to chosen countries, which can hold individual devices for itself.
 
@@ -23,7 +24,9 @@ Source: <https://github.com/bolivian-peru/proxies-sx-mcp-server> · npm: [`@prox
 | **x402 wallet** (optional) | `AGENT_WALLET_KEY=0x...` | The agent must pay by itself in USDC on Base and cannot hold an account. |
 | **Both** | both variables | Every tool of both modes is listed. |
 
-Create the key at [client.proxies.sx/account](https://client.proxies.sx/account). A customer key can hold `ports:read`, `ports:write`, `ports:rotate`, `billing:read`, `account:read`, `account:write`, `traffic:read`, `tickets:read`, `tickets:write`. It cannot hold `billing:write`: buying traffic through the API is for reseller and admin keys, and a customer buys in the dashboard at [client.proxies.sx/purchase](https://client.proxies.sx/purchase).
+Create the key at [client.proxies.sx/account](https://client.proxies.sx/account). A customer key can hold `ports:read`, `ports:write`, `ports:rotate`, `billing:read`, `account:read`, `account:write`, `traffic:read`, `tickets:read`, `tickets:write`, plus two opt-in scopes that must be ticked on purpose: `modems:purchase` (buy or renew a Private modem) and `billing:topup` (card top-up link, under the key's daily cap). It cannot hold `billing:write`: buying GB through the API is for reseller and admin keys, and a customer buys GB in the dashboard at [client.proxies.sx/purchase](https://client.proxies.sx/purchase).
+
+The server lists 20 tools by default (buy, use, manage). Start it with `--toolset=full` (or `PROXIES_TOOLSET=full`) for dedicated ports, Private Pools, crypto orders, coupons, `pak_` keys and ops tools.
 
 ## Install
 
@@ -94,6 +97,20 @@ Username grammar: `psx_<account>-<pool>-<country>[-token-value ...]`. Let `pool_
 5. delete_port {portId}
 ```
 
+**A dedicated device with unlimited traffic (Private modem)**
+
+```
+1. proxies_modem_catalog {country: "de"}                        -> plans, price in USD per modem, stock
+2. proxies_modem_quote {tariffId}                               -> current price; tell the user and wait for a yes
+3. proxies_modem_buy {tariffId, expectedPriceUsd, confirm: true} -> order + the Idempotency-Key it used
+4. proxies_modem_mine                                           -> credentials when the order succeeded (poll every 10 s)
+5. proxies_modem_rotate {modemId}; proxies_modem_quote {modemId} then proxies_modem_renew {modemId, period, expectedPriceUsd, confirm: true}
+```
+
+Never set `confirm: true` before the user agreed to the exact USD amount. Retry a failed buy or renew with the same `idempotencyKey`; after `insufficient_balance` nothing was charged, so top up and order again with a new key. After `price_changed` quote again and confirm the new price.
+
+**Balance too low**: `proxies_topup_checkout {amountUsd, confirm: true}` returns a Stripe Checkout `url` and `sessionId`. A person opens the url and pays by card; the agent cannot. Then `proxies_topup_status {sessionId}` about every 10 s until `credited` is true, and `get_account_summary`.
+
 **Reach a person**: `create_support_ticket {subject, message}`, then `get_ticket`.
 
 **Pay with a wallet instead of an account (x402 mode)**
@@ -109,22 +126,35 @@ Username grammar: `psx_<account>-<pool>-<country>[-token-value ...]`. Let `pool_
 ## Tool catalog
 
 <!-- tools:start -->
-Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edit by hand.
+Generated from the code of version 3.1.0 by `npm run build:manifest`. Do not edit by hand.
+
+The 20 tools marked "Default" are listed without a flag; the others need `--toolset=full` (or `PROXIES_TOOLSET=full`). Wallet tools are always listed when a wallet is set.
 
 **Pool Gateway**
 
 | Tool | What it does |
 |---|---|
-| `pool_get_stock` | Get live Pool Gateway stock, no account needed. Also listed in wallet mode. |
+| `pool_get_stock` | Get live Pool Gateway stock, no account needed. Default. Also listed in wallet mode. |
 | `pool_get_facets` | List the cities, states, carriers (with ASN and class) and IP classes that have stock in one country, with counts, no account needed. Also listed in wallet mode. |
-| `pool_build_proxy_url` | Build a ready-to-use Pool Gateway proxy URL (gw.proxies.sx, HTTP 7000 or SOCKS5 7001). Also listed in wallet mode. |
-| `pool_explain_error` | Explain a Pool Gateway error and say what to do about it. Also listed in wallet mode. |
-| `pool_get_my_credentials` | Get your Pool Gateway proxy username and proxy password with ready HTTP and SOCKS5 URLs. |
-| `pool_set_proxy_password` | Set a new proxy password (at least 6 characters). |
+| `pool_build_proxy_url` | Build a ready-to-use Pool Gateway proxy URL (gw.proxies.sx, HTTP 7000 or SOCKS5 7001). Default. Also listed in wallet mode. |
+| `pool_explain_error` | Explain a Pool Gateway error and say what to do about it. Default. Also listed in wallet mode. |
+| `pool_get_my_credentials` | Get your Pool Gateway proxy username and proxy password with ready HTTP and SOCKS5 URLs. Default. |
+| `pool_set_proxy_password` | Set a new proxy password (at least 6 characters). Default. |
 | `pool_get_my_stats` | Get your own Pool Gateway traffic and open connections, plus the health score of the pool and how many devices are connected to it. |
 | `pool_list_sessions` | List your saved Pool Gateway sessions: pool, country, carrier, rotation mode, bytes and last activity. |
 | `pool_close_session` | Close one Pool Gateway session by the sessionKey from pool_list_sessions. |
 | `pool_close_all_sessions` | Close every saved Pool Gateway session of the account. |
+
+**Private modems**
+
+| Tool | What it does |
+|---|---|
+| `proxies_modem_catalog` | List the Private modem plans for sale right now: country, carrier, period (day, week or month), price in USD, stock, OpenVPN and p0f support, regions. Default. |
+| `proxies_modem_quote` | Price check before spending. Default. |
+| `proxies_modem_buy` | Rent a Private modem (one dedicated 4G/5G modem, unlimited traffic) from the account balance. Default. |
+| `proxies_modem_renew` | Extend the rental of one of your Private modems from the account balance. Default. |
+| `proxies_modem_rotate` | Ask one of your Private modems for a new IP address. Default. |
+| `proxies_modem_mine` | List your rented Private modems: status, expiry, online state, HTTP and SOCKS5 credentials, rotation settings, auto-renew, plus open orders and recent failures. Default. |
 
 **Private Pool and Reserved IPs**
 
@@ -145,14 +175,14 @@ Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edi
 
 | Tool | What it does |
 |---|---|
-| `get_account_summary` | Get the account balance, free port slots, traffic bought and left, and any account alerts. |
-| `get_account_usage` | Get traffic purchased, used and still available, split into Pool Gateway traffic and dedicated-port traffic. |
+| `get_account_summary` | Get the account balance, free port slots, traffic bought and left, and any account alerts. Default. |
+| `get_account_usage` | Get traffic purchased, used and still available, split into Pool Gateway traffic and dedicated-port traffic. Default. |
 
 **Billing**
 
 | Tool | What it does |
 |---|---|
-| `get_pricing` | Get the live price per GB, the volume discounts, the free port-slot tiers and your current tier. |
+| `get_pricing` | Get the live price per GB, the volume discounts, the free port-slot tiers and your current tier. Default. |
 | `calculate_price` | Calculate what a GB amount costs with the volume discount applied. |
 | `purchase_shared_traffic` | Buy traffic in GB from the account balance. |
 | `coupon_validate` | Check whether a coupon code is valid for an order, without using it. |
@@ -163,6 +193,8 @@ Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edi
 
 | Tool | What it does |
 |---|---|
+| `proxies_topup_checkout` | Add money to the account balance by card: creates a Stripe Checkout page and returns its url and sessionId. Default. |
+| `proxies_topup_status` | Check whether a card top-up started with proxies_topup_checkout was paid and credited to the balance (credited true or false). Default. |
 | `create_crypto_payment` | Create a crypto order that tops up the account balance and return its hosted payment link. |
 | `check_crypto_payment_status` | Check whether a crypto order is still unpaid, confirming, paid, expired or cancelled, and whether the balance was credited. |
 | `get_pending_crypto_payments` | List the account's crypto orders that are not finished yet, with their payment links. |
@@ -208,16 +240,16 @@ Generated from the code of version 3.0.1 by `npm run build:manifest`. Do not edi
 |---|---|
 | `get_proxy_connection_string` | Build the HTTP or SOCKS5 connection string of a dedicated port (contains the port password). |
 | `get_all_proxy_formats` | Get a dedicated port in every common format: URLs, host:port, environment variables, curl, Python and Node.js snippets, and its public rotation link. |
-| `get_service_status` | Check whether Proxies.sx is healthy right now: open Pool Gateway incidents, the state of the API, gateway and relay, and recent uptime. Also listed in wallet mode. |
+| `get_service_status` | Check whether Proxies.sx is healthy right now: open Pool Gateway incidents, the state of the API, gateway and relay, and recent uptime. Default. Also listed in wallet mode. |
 | `get_os_fingerprint_options` | List the OS fingerprint values create_port and update_os_fingerprint accept. |
 
 **Support**
 
 | Tool | What it does |
 |---|---|
-| `create_support_ticket` | Open a support ticket that a person at Proxies.sx reads and answers. |
-| `list_my_tickets` | List your support tickets with their status and IDs. |
-| `get_ticket` | Get one support ticket with the original message and every reply. |
+| `create_support_ticket` | Open a support ticket that a person at Proxies.sx reads and answers. Default. |
+| `list_my_tickets` | List your support tickets with their status and IDs. Default. |
+| `get_ticket` | Get one support ticket with the original message and every reply. Default. |
 | `reply_to_ticket` | Add a reply to one of your support tickets. |
 | `close_ticket` | Close one of your support tickets once the problem is solved. |
 
@@ -293,7 +325,10 @@ A failing tool returns an MCP error result (`isError: true`). For the common cas
 | Error | Cause | Fix |
 |---|---|---|
 | 401 on any API tool | `PROXIES_API_KEY` missing, wrong, expired or revoked | New key at [client.proxies.sx/account](https://client.proxies.sx/account) |
-| 403 "missing required scope" | The key lacks that scope | Create a key with it. `billing:write` and `customers:*` are not available to customer keys |
+| 403 "missing required scope" | The key lacks that scope | Create a key with it. `billing:write` and `customers:*` are not available to customer keys; `modems:purchase` and `billing:topup` are opt-in ticks |
+| `price_changed`, `no_stock`, `insufficient_balance`, `spend_cap_reached`, `recent_checkout`, `renewal_open` | A purchase the API refused | The `What to do:` line is the API's own fix for that code |
+| "confirm is not true" | A spending tool was called before the user agreed | Show the USD amount, get a yes, call again with `confirm: true` |
+| "Unknown tool" for a port, pool-key or ops tool | Server runs the default toolset | Start it with `--toolset=full` or `PROXIES_TOOLSET=full` |
 | 429 | Rate limit | Wait a minute; do not loop |
 | 5xx | Server-side failure | Retry once, then `get_service_status` |
 | "Insufficient USDC balance" (x402) | Wallet cannot cover the price | Send USDC on Base to the wallet address in the message |
@@ -306,7 +341,8 @@ A failing tool returns an MCP error result (`isError: true`). For the common cas
 2. `AGENT_WALLET_KEY` controls real USDC. Use a wallet that holds only what the agent may spend.
 3. Tools whose description says "Returns a secret" print a proxy password or a `pak_` key. Do not log their output.
 4. Do not commit `.mcp.json` or any config file that carries a key.
-5. The API never returns the exit IP of a dedicated port or pool session. `reserved_ip_list` shows the exit IP of a device you reserved; never publish it.
+5. The API never returns the exit IP of a dedicated port or pool session. `reserved_ip_list` shows the exit IP of a device you reserved and `proxies_modem_mine` the exit IP of your own modem; never publish them.
+6. `proxies_modem_buy`, `proxies_modem_renew` and `proxies_topup_checkout` move money. Set `confirm: true` only after the user agreed to the exact USD amount, and reuse the returned `idempotencyKey` for a retry.
 
 ## Environment variables
 
@@ -317,6 +353,7 @@ A failing tool returns an MCP error result (`isError: true`). For the common cas
 | `AGENT_WALLET_KEY` | x402 mode: `0x` private key of a USDC wallet on Base |
 | `BASE_RPC_URL` | x402 mode, optional: custom Base RPC |
 | `PROXIES_API_URL` | Optional API base. Default `https://api.proxies.sx`; a trailing `/v1` is accepted |
+| `PROXIES_TOOLSET` | `default` (20 tools) or `full` (every API-key tool); `--toolset=full` does the same |
 
 ## Links
 
