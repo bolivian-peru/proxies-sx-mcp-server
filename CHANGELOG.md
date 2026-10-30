@@ -7,6 +7,7 @@ Hosted server at `https://api.proxies.sx/mcp`.
 ### Added
 - **Streamable HTTP mode** (`--http`, or `MCP_HTTP_PORT`; `MCP_HTTP_HOST`, default `127.0.0.1`): stateless, one server per request built from that request's `Authorization: Bearer` or `X-API-Key` key, so no key or state is shared between callers. `?toolset=full` lists every API-key tool. The caller IP from the local reverse proxy is forwarded to the API so rate limits apply per caller. x402 wallet mode stays local.
 - `server.json` lists the hosted endpoint under `remotes`.
+- The Claude Code plugin connects to the hosted endpoint (no Node needed), sending the userConfig API key as `Authorization: Bearer`.
 - Server `instructions` at initialize: with a key, the shortest path to a working proxy; without one, how to get a key and where the prices are.
 
 ### Changed

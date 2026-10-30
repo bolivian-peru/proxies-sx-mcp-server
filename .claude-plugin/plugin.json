@@ -1,7 +1,7 @@
 {
   "name": "proxies-sx",
   "displayName": "Proxies.sx",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Residential and mobile proxies for AI agents: Pool Gateway proxy URLs, live stock per country, IP rotation, Private modems, usage, billing and support, through the @proxies-sx/mcp-server MCP server.",
   "author": {
     "name": "Proxies.sx",
@@ -22,13 +22,10 @@
   ],
   "mcpServers": {
     "proxies-sx": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@proxies-sx/mcp-server@3.1.0"
-      ],
-      "env": {
-        "PROXIES_API_KEY": "${user_config.PROXIES_API_KEY}"
+      "type": "http",
+      "url": "https://api.proxies.sx/mcp",
+      "headers": {
+        "Authorization": "Bearer ${user_config.PROXIES_API_KEY}"
       }
     }
   },
@@ -36,7 +33,7 @@
     "PROXIES_API_KEY": {
       "type": "string",
       "title": "Proxies.sx API key",
-      "description": "psx_ key from https://client.proxies.sx/account. Leave empty only for x402 wallet mode.",
+      "description": "psx_ key from https://client.proxies.sx/account. Leave empty to see only the public tools (stock, proxy URL format, error help).",
       "sensitive": true
     }
   },
