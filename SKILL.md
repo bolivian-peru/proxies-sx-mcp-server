@@ -126,7 +126,7 @@ Never set `confirm: true` before the user agreed to the exact USD amount. Retry 
 ## Tool catalog
 
 <!-- tools:start -->
-Generated from the code of version 3.1.0 by `npm run build:manifest`. Do not edit by hand.
+Generated from the code of version 3.2.0 by `npm run build:manifest`. Do not edit by hand.
 
 The 20 tools marked "Default" are listed without a flag; the others need `--toolset=full` (or `PROXIES_TOOLSET=full`). Wallet tools are always listed when a wallet is set.
 

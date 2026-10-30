@@ -26,6 +26,18 @@ claude mcp add proxies-sx -e PROXIES_API_KEY=psx_your_api_key_here -- npx -y @pr
 /plugin install proxies-sx@proxies-sx
 ```
 
+   Or connect to the hosted server, with nothing to install: `https://api.proxies.sx/mcp` (Streamable HTTP). Send the key as `Authorization: Bearer psx_...`; without a key only the public tools are listed (stock, proxy URL format, error help, service status).
+
+```bash
+claude mcp add --transport http proxies-sx https://api.proxies.sx/mcp --header "Authorization: Bearer psx_your_api_key_here"
+```
+
+```json
+{ "mcpServers": { "proxies-sx": { "url": "https://api.proxies.sx/mcp", "headers": { "Authorization": "Bearer psx_your_api_key_here" } } } }
+```
+
+   Add `?toolset=full` to the URL for every API-key tool. The x402 wallet mode runs only locally (npx), because the hosted server never holds a wallet key.
+
 3. Ask for a proxy:
 
 > Check Pool Gateway stock for Germany, then give me a sticky residential proxy URL there.
@@ -157,7 +169,7 @@ The container speaks MCP over stdio (`-i` is required).
 ## Tools
 
 <!-- tools:start -->
-Generated from the code of version 3.1.0 by `npm run build:manifest`. Do not edit by hand.
+Generated from the code of version 3.2.0 by `npm run build:manifest`. Do not edit by hand.
 
 The 20 tools marked "Default" are listed without a flag; the others need `--toolset=full` (or `PROXIES_TOOLSET=full`). Wallet tools are always listed when a wallet is set.
 

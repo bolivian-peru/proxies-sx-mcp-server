@@ -108,7 +108,7 @@ export function redactSecrets(text: string): string {
 
 function statusHint(statusCode: number, message: string): string | null {
   if (statusCode === 401) {
-    return 'The API key is missing, invalid, expired or revoked. Create a key at https://client.proxies.sx/account and set it as PROXIES_API_KEY.';
+    return 'The API key is missing, invalid, expired or revoked. Create a key at https://client.proxies.sx/account and set it as PROXIES_API_KEY (local) or send it as "Authorization: Bearer <key>" (hosted, https://api.proxies.sx/mcp).';
   }
   if (statusCode === 403) {
     const scope = message.match(/scope:?\s*([a-z]+:[a-z]+)/i)?.[1];

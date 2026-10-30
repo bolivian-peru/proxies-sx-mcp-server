@@ -24,19 +24,27 @@
  *   }
  */
 
-import { startMcpServer, getConfigFromEnv } from './server.js';
+import { startMcpServer, getConfigFromEnv, normalizeBaseUrl } from './server.js';
+import { startHttpServer } from './http.js';
 
 // Re-export everything for programmatic usage
 export * from './api/index.js';
 export * from './tools/index.js';
 export * from './utils/index.js';
 export * from './server.js';
+export * from './http.js';
 
 /**
  * Main entry point
  */
 async function main(): Promise<void> {
   try {
+    // Hosted mode: `--http` or MCP_HTTP_PORT serves Streamable HTTP; API keys come per request
+    if (process.argv.includes('--http') || process.env.MCP_HTTP_PORT) {
+      startHttpServer({ port: Number(process.env.MCP_HTTP_PORT || 3410), host: process.env.MCP_HTTP_HOST, baseUrl: normalizeBaseUrl(process.env.PROXIES_API_URL) });
+      return;
+    }
+
     // Get configuration from environment
     const config = getConfigFromEnv();
 

@@ -13,6 +13,8 @@ export interface ApiClientConfig {
   token?: string;
   authType?: AuthType;
   timeout?: number;
+  /** The caller's IP, sent as X-Forwarded-For so the API rate-limits each hosted caller separately */
+  forwardedFor?: string;
 }
 
 type QueryParams = Record<string, string | number | boolean | undefined>;
@@ -40,24 +42,27 @@ export class ApiClient {
   private readonly token?: string;
   private readonly authType: AuthType;
   private readonly timeout: number;
+  private readonly forwardedFor?: string;
 
   constructor(config: ApiClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, ''); // Remove trailing slash
     this.token = config.token;
     this.authType = config.authType ?? 'apiKey';
     this.timeout = config.timeout ?? 30000; // 30 seconds default
+    this.forwardedFor = config.forwardedFor;
   }
 
   /**
    * Build full URL for endpoint
    */
   private buildUrl(endpoint: string, queryParams?: QueryParams): string {
-    // Ids from tool arguments are put into the path. One that carries ?, #,
-    // a backslash or a dot segment could steer the request to another route.
-    if (/[?#\\]|(^|\/)(\.|%2e){1,2}(\/|$)/i.test(endpoint)) {
-      throw new ApiClientError('An id in this request contains characters that are not allowed (?, #, \\ or a "." or ".." path segment).', 0);
-    }
+    // Ids from tool arguments are put into the path. If URL parsing changes the
+    // path at all (?, #, a backslash, a dot segment, or tabs and newlines it
+    // silently drops), an id could steer the request to another route.
     const url = new URL(`${this.baseUrl}${endpoint}`);
+    if (url.pathname !== new URL(this.baseUrl).pathname.replace(/\/$/, '') + endpoint) {
+      throw new ApiClientError('An id in this request contains characters that are not allowed (?, #, \\, spaces or control characters, or a "." or ".." path segment).', 0);
+    }
 
     if (queryParams) {
       Object.entries(queryParams).forEach(([key, value]) => {
@@ -79,6 +84,7 @@ export class ApiClient {
       'Content-Type': 'application/json',
       ...additionalHeaders,
     };
+    if (this.forwardedFor) headers['X-Forwarded-For'] = this.forwardedFor;
 
     if (!this.token) return headers;
 

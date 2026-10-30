@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "proxies-sx-mcp-server",
   "display_name": "Proxies.sx",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Residential and mobile proxies for AI agents: Pool Gateway URLs, live stock per country, Private modems, card top-ups, Private Pools and Reserved IPs, dedicated ports, billing and support. 20 tools by default (96 with --toolset=full), 16 more with an agent wallet.",
   "long_description": "Use Proxies.sx metered residential and mobile proxy bandwidth and Private modems from Claude. The Pool Gateway (gw.proxies.sx, HTTP 7000 / SOCKS5 7001) is one endpoint with routing in the username: the peer pool covers most countries, the mbl pool is carrier modems in US, GB, FR, NL, PL and GE (Georgia). You pay per GB with a volume discount; time is free (the get_pricing tool reads the live price). A Private modem is one dedicated 4G/5G modem rented by the day, week or month with unlimited traffic, paid from the balance (proxies_modem_* tools). Set PROXIES_API_KEY (create a key at https://client.proxies.sx/account) for the standard account path. AGENT_WALLET_KEY is the optional x402 path: pay per GB in USDC without an account.",
   "author": {

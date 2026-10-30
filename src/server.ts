@@ -6,6 +6,7 @@
  * 1. API key (PROXIES_API_KEY): the standard path, an account with deposited GB
  * 2. x402 wallet (AGENT_WALLET_KEY): optional, pay per GB in USDC without an account
  * 3. Both set: every tool of both modes
+ * 4. Neither: only the public tools (stock, facets, proxy URL builder, error help, status)
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -53,6 +54,9 @@ export interface McpServerConfig {
 
   /** Which API-key tools to list: the default ~20 (DEFAULT_TOOL_NAMES) or all of them */
   toolset?: Toolset;
+
+  /** Hosted mode: the caller's IP, forwarded to the API for per-caller rate limits */
+  forwardedFor?: string;
 }
 
 export type Toolset = 'default' | 'full';
@@ -67,6 +71,19 @@ interface RegisteredTool {
 }
 
 type ArgumentSchema = { safeParse: (data: unknown) => { success: boolean; data?: unknown; error?: { message: string } } };
+
+/** Told to the agent at initialize: the shortest path from question to working proxy */
+const ACCOUNT_INSTRUCTIONS =
+  'Proxies.sx: residential and mobile proxies, metered per GB. To get a working proxy: pool_get_stock (pick a country with stock), ' +
+  'get_account_summary (GB left), proxies_topup_checkout when none is left (returns a payment link for the user), pool_get_my_credentials, ' +
+  'then pool_build_proxy_url and send traffic through gw.proxies.sx:7000 (HTTP) or :7001 (SOCKS5). For a dedicated whole 4G/5G modem: ' +
+  'proxies_modem_catalog, proxies_modem_quote, proxies_modem_buy (pass your own idempotencyKey to buy and renew, and reuse it on a retry, ' +
+  'so a lost response never buys twice). On any proxy error code, call pool_explain_error.';
+const PUBLIC_INSTRUCTIONS =
+  'Proxies.sx: residential and mobile proxies, metered per GB. Connected without an API key, so only the public tools are listed ' +
+  '(stock per country, proxy URL format, error help, service status). To buy and use proxies, the user creates an account and an API key at ' +
+  'https://client.proxies.sx/account, then reconnects with the header "Authorization: Bearer <key>" (hosted, https://api.proxies.sx/mcp) ' +
+  'or PROXIES_API_KEY (local npx). Prices: https://api.proxies.sx/v1/pricing';
 
 /**
  * Default API base URL
@@ -105,19 +122,14 @@ export function toolsetFrom(argv: readonly string[], env: NodeJS.ProcessEnv): To
 /**
  * Determine which mode to use based on config
  */
-function getAuthMode(config: McpServerConfig): 'apiKey' | 'x402' | 'hybrid' {
+function getAuthMode(config: McpServerConfig): 'apiKey' | 'x402' | 'hybrid' | 'public' {
   const hasApiKey = !!(config.apiKey || (config.email && config.password));
   const hasWallet = !!config.walletPrivateKey;
 
   if (hasApiKey && hasWallet) return 'hybrid';
   if (hasWallet) return 'x402';
   if (hasApiKey) return 'apiKey';
-
-  throw new Error(
-    'Authentication required. Set one of:\n' +
-    '  - PROXIES_API_KEY: API key from https://client.proxies.sx/account\n' +
-    '  - AGENT_WALLET_KEY: Your wallet private key for x402 payments'
-  );
+  return 'public';
 }
 
 /**
@@ -129,7 +141,7 @@ export async function createMcpServer(config: McpServerConfig) {
 
   // Account credential for the API-key tools; absent in wallet-only mode
   let auth: Awaited<ReturnType<typeof getAuthToken>> | undefined;
-  if (authMode !== 'x402') {
+  if (authMode === 'apiKey' || authMode === 'hybrid') {
     try {
       auth = await getAuthToken({
         baseUrl,
@@ -148,7 +160,7 @@ export async function createMcpServer(config: McpServerConfig) {
 
   // Without an account only the tools that call public routes are registered;
   // with one, the default toolset unless the full one was asked for
-  const api = createProxiesApi({ baseUrl, token: auth?.token, authType: auth?.type });
+  const api = createProxiesApi({ baseUrl, token: auth?.token, authType: auth?.type, forwardedFor: config.forwardedFor });
   const apiTools: RegisteredTool[] = allToolDefinitions.filter(tool => listedNames(!!auth, config.toolset).includes(tool.name));
 
   let toolHandlers: ToolHandlers = createAllToolHandlers(api, baseUrl);
@@ -185,6 +197,7 @@ export async function createMcpServer(config: McpServerConfig) {
       capabilities: {
         tools: {},
       },
+      instructions: auth ? ACCOUNT_INSTRUCTIONS : PUBLIC_INSTRUCTIONS,
     }
   );
 
@@ -292,19 +305,9 @@ export function getConfigFromEnv(): McpServerConfig {
   const walletPrivateKey = process.env.AGENT_WALLET_KEY;
   const baseRpcUrl = process.env.BASE_RPC_URL;
 
-  // Validate that we have at least one form of authentication
-  const hasApiKey = !!(apiKey || (email && password));
-  const hasWallet = !!walletPrivateKey;
-
-  if (!hasApiKey && !hasWallet) {
-    throw new Error(
-      'Authentication required. Set one of:\n' +
-      '  Mode 1 (API Key):\n' +
-      '    - PROXIES_API_KEY: Your API key from https://client.proxies.sx/account\n' +
-      '    - Or PROXIES_EMAIL and PROXIES_PASSWORD: Your login credentials\n' +
-      '  Mode 2 (x402 Wallet - No API key needed):\n' +
-      '    - AGENT_WALLET_KEY: private key of a USDC wallet on the Base network'
-    );
+  // Without any credential the server still starts, with the public tools only
+  if (!apiKey && !(email && password) && !walletPrivateKey) {
+    console.error('No PROXIES_API_KEY or AGENT_WALLET_KEY set: only the public tools are listed. Create a key at https://client.proxies.sx/account');
   }
 
   return {

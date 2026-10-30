@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased
+## 3.2.0 (2026-10-30)
+
+Hosted server at `https://api.proxies.sx/mcp`.
+
+### Added
+- **Streamable HTTP mode** (`--http`, or `MCP_HTTP_PORT`; `MCP_HTTP_HOST`, default `127.0.0.1`): stateless, one server per request built from that request's `Authorization: Bearer` or `X-API-Key` key, so no key or state is shared between callers. `?toolset=full` lists every API-key tool. The caller IP from the local reverse proxy is forwarded to the API so rate limits apply per caller. x402 wallet mode stays local.
+- `server.json` lists the hosted endpoint under `remotes`.
+- Server `instructions` at initialize: with a key, the shortest path to a working proxy; without one, how to get a key and where the prices are.
+
+### Changed
+- Without any credential the server starts with the public tools only, instead of exiting.
+
+### Security
+- Path ids: a request is refused when URL parsing would change its path at all. This closes ids with tabs or newlines (which URL parsing drops, so `.\t.` became `..`) and replaces the earlier character list.
+- Hosted mode caps JSON-RPC batches at 10 requests and in-flight requests at 100, and answers a malformed request line with 400.
 
 - Claude Code plugin: `.claude-plugin/marketplace.json` and `plugin.json` make the repository a one-plugin marketplace (`/plugin marketplace add bolivian-peru/proxies-sx-mcp-server`, then `/plugin install proxies-sx@proxies-sx`). The plugin starts the pinned `npx -y @proxies-sx/mcp-server@3.1.0`, asks for `PROXIES_API_KEY` as a sensitive userConfig value, carries the directory icon and policy links, and loads `SKILL.md` as its skill. The npm package is unchanged.
 
