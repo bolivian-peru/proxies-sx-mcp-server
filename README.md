@@ -97,7 +97,7 @@ A tool that fails returns an MCP error result (`isError: true`) whose text ends 
 
 ### Toolsets
 
-By default the server lists **20 tools**, grouped by what an agent does: **buy** (`proxies_modem_catalog`, `proxies_modem_quote`, `proxies_modem_buy`, `proxies_modem_renew`, `proxies_topup_checkout`, `proxies_topup_status`, `get_pricing`), **use** (`pool_get_stock`, `pool_get_my_credentials`, `pool_build_proxy_url`, `pool_explain_error`, `proxies_modem_mine`, `proxies_modem_rotate`) and **manage** (`get_account_summary`, `get_account_usage`, `pool_set_proxy_password`, `get_service_status`, `create_support_ticket`, `list_my_tickets`, `get_ticket`). Fewer tools in the list means a client picks the right one more often.
+With an API key the default toolset lists **20 tools**, grouped by what an agent does: **buy** (`proxies_modem_catalog`, `proxies_modem_quote`, `proxies_modem_buy`, `proxies_modem_renew`, `proxies_topup_checkout`, `proxies_topup_status`, `get_pricing`), **use** (`pool_get_stock`, `pool_get_my_credentials`, `pool_build_proxy_url`, `pool_explain_error`, `proxies_modem_mine`, `proxies_modem_rotate`) and **manage** (`get_account_summary`, `get_account_usage`, `pool_set_proxy_password`, `get_service_status`, `create_support_ticket`, `list_my_tickets`, `get_ticket`). The key’s scopes determine which account tools it can use.
 
 Everything else (dedicated ports, Private Pools and Reserved IPs, crypto orders, coupons, `pak_` keys, x402 session management, ops) is listed with the **full** toolset:
 
@@ -114,7 +114,7 @@ The wallet tools are not affected by the toolset: they are always listed when `A
 | `AGENT_WALLET_KEY` | Private key (`0x...`) of a USDC wallet on the Base network, for x402 payments without an account |
 | `BASE_RPC_URL` | Custom Base RPC endpoint, for x402 (default `https://mainnet.base.org`) |
 | `PROXIES_API_URL` | API base URL. Default `https://api.proxies.sx`; a trailing `/v1` is accepted and ignored. Leave it unset unless you run a private API. |
-| `PROXIES_TOOLSET` | `default` (20 tools) or `full` (every API-key tool). The `--toolset=full` argument does the same. |
+| `PROXIES_TOOLSET` | With an API key, `default` lists 20 tools and `full` lists 96. The `--toolset=full` argument does the same. |
 
 ## Usage with MCP clients
 
@@ -172,7 +172,7 @@ The container speaks MCP over stdio (`-i` is required).
 <!-- tools:start -->
 Generated from the code of version 3.2.0 by `npm run build:manifest`. Do not edit by hand.
 
-The 20 tools marked "Default" are listed without a flag; the others need `--toolset=full` (or `PROXIES_TOOLSET=full`). Wallet tools are always listed when a wallet is set.
+With an API key, the 20 tools marked "Default" are listed without a flag. Other account tools need `--toolset=full` (or `PROXIES_TOOLSET=full`). 5 tools are listed without credentials. A local wallet adds 16 wallet tools.
 
 **Pool Gateway**
 
@@ -421,8 +421,8 @@ Devices that share their connection through the peer SDK are paid per GB served.
 
 ## Troubleshooting
 
-- **"Authentication required" at start.** Neither `PROXIES_API_KEY` nor `AGENT_WALLET_KEY` is set in the environment the client starts the server with.
-- **Every tool answers 401.** The key is wrong, expired or revoked. Create a new one at [client.proxies.sx/account](https://client.proxies.sx/account).
+- **Only five tools appear.** The server is in public mode. For account tools, set `PROXIES_API_KEY` in your stdio client or send a bearer key to the hosted URL, then reconnect. Select the full toolset for all 96 account tools.
+- **An account tool answers 401.** The key is wrong, expired or revoked. Create a new one at [client.proxies.sx/account](https://client.proxies.sx/account).
 - **A tool answers 403 "missing required scope".** Create a key that includes that scope. `billing:write` and `customers:*` cannot be given to a customer key (see above). `modems:purchase` and `billing:topup` are opt-in: tick them when creating the key.
 - **A purchase tool answers with a code** such as `price_changed`, `no_stock`, `insufficient_balance` or `spend_cap_reached`. The `What to do:` line is the API's own fix for that code; follow it rather than retrying the same call.
 - **`proxies_modem_buy` answers "confirm is not true".** Nothing was bought. Show the user the USD price from `proxies_modem_quote` and call again with `confirm: true` once they agree.

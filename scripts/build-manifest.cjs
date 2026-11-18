@@ -60,12 +60,12 @@ const manifest = {
   name: 'proxies-sx-mcp-server',
   display_name: 'Proxies.sx',
   version: pkg.version,
-  description: `Residential and mobile proxies for AI agents: Pool Gateway URLs, live stock per country, Private modems, card top-ups, Private Pools and Reserved IPs, dedicated ports, billing and support. ${DEFAULT_TOOL_NAMES.length} tools by default (${apiTools.length} with --toolset=full), ${x402ToolDefinitions.length} more with an agent wallet.`,
+  description: `Residential and mobile proxies with ${PUBLIC_TOOL_NAMES.length} public tools. An API key lists ${DEFAULT_TOOL_NAMES.length} tools by default or ${apiTools.length} in full mode. A local wallet adds ${x402ToolDefinitions.length} tools.`,
   long_description:
     'Use Proxies.sx metered residential and mobile proxy bandwidth and Private modems from Claude. ' +
     'The Pool Gateway (gw.proxies.sx, HTTP 7000 / SOCKS5 7001) is one endpoint with routing in the username: ' +
     'the peer pool covers most countries, the mbl pool is carrier modems in US, GB, FR, NL, PL and GE (Georgia). ' +
-    'You pay per GB with a volume discount; time is free (the get_pricing tool reads the live price). ' +
+    'Account traffic is metered by the exit country. See the country tiers and volume discounts at https://api.proxies.sx/v1/pricing. ' +
     'A Private modem is one dedicated 4G/5G modem rented by the day, week or month with unlimited traffic, paid from the balance (proxies_modem_* tools). ' +
     'Set PROXIES_API_KEY (create a key at https://client.proxies.sx/account) for the standard account path. ' +
     'AGENT_WALLET_KEY is the optional x402 path: pay per GB in USDC without an account.',
@@ -121,7 +121,7 @@ function toolListMarkdown() {
   const lines = [
     `Generated from the code of version ${pkg.version} by \`npm run build:manifest\`. Do not edit by hand.`,
     '',
-    `The ${DEFAULT_TOOL_NAMES.length} tools marked "Default" are listed without a flag; the others need \`--toolset=full\` (or \`PROXIES_TOOLSET=full\`). Wallet tools are always listed when a wallet is set.`,
+    `With an API key, the ${DEFAULT_TOOL_NAMES.length} tools marked "Default" are listed without a flag. Other account tools need \`--toolset=full\` (or \`PROXIES_TOOLSET=full\`). ${PUBLIC_TOOL_NAMES.length} tools are listed without credentials. A local wallet adds ${x402ToolDefinitions.length} wallet tools.`,
   ];
   let category;
   for (const row of catalogue) {

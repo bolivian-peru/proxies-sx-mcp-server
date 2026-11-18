@@ -20,17 +20,18 @@ Source: <https://github.com/bolivian-peru/proxies-sx-mcp-server> · npm: [`@prox
 
 | Mode | Environment | Use it when |
 |---|---|---|
+| **Public** | No credentials | Five public tools for stock, location filters, proxy URL format, gateway errors and service status. |
 | **API key** (standard) | `PROXIES_API_KEY=psx_...` | The user has, or can create, a Proxies.sx account with GB on it. This is the default. |
 | **x402 wallet** (optional) | `AGENT_WALLET_KEY=0x...` | The agent must pay by itself in USDC on Base and cannot hold an account. |
-| **Both** | both variables | Every tool of both modes is listed. |
+| **Both** | both variables in local stdio | 36 tools by default or 112 with the full toolset. |
 
 Create the key at [client.proxies.sx/account](https://client.proxies.sx/account). A customer key can hold `ports:read`, `ports:write`, `ports:rotate`, `billing:read`, `account:read`, `account:write`, `traffic:read`, `tickets:read`, `tickets:write`, plus two opt-in scopes that must be ticked on purpose: `modems:purchase` (buy or renew a Private modem) and `billing:topup` (card top-up link, under the key's daily cap). It cannot hold `billing:write`: buying GB through the API is for reseller and admin keys, and a customer buys GB in the dashboard at [client.proxies.sx/purchase](https://client.proxies.sx/purchase).
 
-The server lists 20 tools by default (buy, use, manage). Start it with `--toolset=full` (or `PROXIES_TOOLSET=full`) for dedicated ports, Private Pools, crypto orders, coupons, `pak_` keys and ops tools.
+An API key lists 20 tools by default. Set `--toolset=full` or `PROXIES_TOOLSET=full` for all 96 account tools, including dedicated ports, Private Pools, crypto orders, coupons, `pak_` keys and ops tools. A local wallet alone lists the 5 public tools and 16 wallet tools.
 
 ## Install
 
-Every client runs `npx -y @proxies-sx/mcp-server` with the key in the environment.
+For local stdio, run `npx -y @proxies-sx/mcp-server`. Clients that support Streamable HTTP can connect to `https://api.proxies.sx/mcp` for public tools, send `Authorization: Bearer psx_...` for account tools and append `?toolset=full` for the full account toolset. Configure wallets only in local stdio.
 
 **Claude Code**
 
@@ -128,7 +129,7 @@ Never set `confirm: true` before the user agreed to the exact USD amount. Retry 
 <!-- tools:start -->
 Generated from the code of version 3.2.0 by `npm run build:manifest`. Do not edit by hand.
 
-The 20 tools marked "Default" are listed without a flag; the others need `--toolset=full` (or `PROXIES_TOOLSET=full`). Wallet tools are always listed when a wallet is set.
+With an API key, the 20 tools marked "Default" are listed without a flag. Other account tools need `--toolset=full` (or `PROXIES_TOOLSET=full`). 5 tools are listed without credentials. A local wallet adds 16 wallet tools.
 
 **Pool Gateway**
 
@@ -353,7 +354,7 @@ A failing tool returns an MCP error result (`isError: true`). For the common cas
 | `AGENT_WALLET_KEY` | x402 mode: `0x` private key of a USDC wallet on Base |
 | `BASE_RPC_URL` | x402 mode, optional: custom Base RPC |
 | `PROXIES_API_URL` | Optional API base. Default `https://api.proxies.sx`; a trailing `/v1` is accepted |
-| `PROXIES_TOOLSET` | `default` (20 tools) or `full` (every API-key tool); `--toolset=full` does the same |
+| `PROXIES_TOOLSET` | With an API key, `default` lists 20 tools and `full` lists 96. `--toolset=full` does the same |
 
 ## Links
 
