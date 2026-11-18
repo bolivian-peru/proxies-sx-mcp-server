@@ -8,7 +8,7 @@
 claude mcp add proxies-sx -e PROXIES_API_KEY=psx_your_api_key_here -- npx -y @proxies-sx/mcp-server
 ```
 
-Any other MCP client (Claude Desktop, Cursor, Windsurf, Cline):
+Local stdio configuration for Claude Desktop, Cursor, Windsurf or Cline:
 
 ```json
 {
@@ -28,13 +28,14 @@ Create the API key at https://client.proxies.sx/account and add GB at https://cl
 
 ## Modes
 
+- **Public:** Both local stdio and hosted Streamable HTTP at https://api.proxies.sx/mcp list five tools without credentials. For hosted account access send an Authorization bearer key and append `?toolset=full` for all 96 account tools.
 - **API key (standard):** `PROXIES_API_KEY`. An account with GB on it. Customer key scopes: ports:read, ports:write, ports:rotate, billing:read, account:read, account:write, traffic:read, tickets:read, tickets:write; opt-in ticks modems:purchase (proxies_modem_buy, proxies_modem_renew) and billing:topup (proxies_topup_checkout, proxies_topup_status). `billing:write` (buying GB through the API) exists only for reseller and admin keys.
-- **x402 wallet (optional):** `AGENT_WALLET_KEY`, the 0x private key of a USDC wallet on Base. No account: the agent pays per GB on-chain.
-- **Both:** set both variables.
+- **x402 wallet (optional):** `AGENT_WALLET_KEY`, the 0x private key of a USDC wallet on Base. Local stdio lists 5 public tools and 16 wallet tools. An agent can pay per GB on-chain.
+- **Both:** Set both variables locally for 36 default tools or 112 with the full toolset.
 
 `PROXIES_API_URL` is optional. Default `https://api.proxies.sx`; a trailing `/v1` is accepted.
 
-`PROXIES_TOOLSET` (or the `--toolset=` argument): `default` lists 20 tools grouped by buy, use and manage; `full` lists every API-key tool (dedicated ports, Private Pools, crypto orders, coupons, pak_ keys, x402 session management, ops). Wallet tools are always listed with `AGENT_WALLET_KEY`.
+`PROXIES_TOOLSET` (or the `--toolset=` argument): an API key lists 20 tools by default or 96 with `full` (dedicated ports, Private Pools, crypto orders, coupons, pak_ keys, x402 session management, ops). Wallet tools are always listed with `AGENT_WALLET_KEY`.
 
 ## Private modems
 
@@ -85,7 +86,7 @@ Gateway error codes (pass the text to `pool_explain_error`): E_AUTH_REQUIRED, E_
 <!-- tools:start -->
 Generated from the code of version 3.2.0 by `npm run build:manifest`. Do not edit by hand.
 
-The 20 tools marked "Default" are listed without a flag; the others need `--toolset=full` (or `PROXIES_TOOLSET=full`). Wallet tools are always listed when a wallet is set.
+With an API key, the 20 tools marked "Default" are listed without a flag. Other account tools need `--toolset=full` (or `PROXIES_TOOLSET=full`). 5 tools are listed without credentials. A local wallet adds 16 wallet tools.
 
 **Pool Gateway**
 
