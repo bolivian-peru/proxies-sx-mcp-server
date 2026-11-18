@@ -8,7 +8,7 @@ MCP (Model Context Protocol) server for [Proxies.sx](https://proxies.sx): [resid
 
 The main product is the **Pool Gateway**: one endpoint, `gw.proxies.sx` (HTTP `7000`, SOCKS5 `7001`), where the proxy username says which pool, country and session you want. With this server an agent reads live stock, gets its credentials, builds the proxy URL, watches usage and opens a support ticket when something is wrong. For a dedicated, unlimited-traffic device it rents a **Private modem** (one 4G/5G modem, by the day, week or month) and tops up the balance by card through a link a person pays. It can also manage dedicated ports on carrier modems, Private Pools and Reserved IPs.
 
-Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`), so a client can ask before a delete, rotate, cancel or purchase. The tools that spend money do nothing until the agent passes `confirm: true`, which it sets only after the user agreed to the exact USD amount.
+Every tool carries MCP annotations (`readOnlyHint`, `destructiveHint`), so a client can ask before a delete, rotate, cancel or purchase. Private modem purchases and renewals require the quoted price and `confirm: true`. Wallet-mode x402 tools can authorize payments from the configured local wallet.
 
 ## Quick start
 
@@ -62,7 +62,7 @@ The username grammar is `psx_<account>-<pool>-<country>[-token-value ...]`. `poo
 - **Sessions need `-sid-`.** `sticky`, `hard` and `auto*` only persist across connections when the username carries `-sid-<id>` (lowercase letters, digits and `_`). `-session-` is not a token: the gateway ignores it without an error.
 - **Sticky holds the device, not the IP.** A mobile carrier can change the exit IP of a held modem. For an address that stays, use a residential peer or a Reserved IP.
 - **Limits per account:** 500 concurrent connections and 250 sessions.
-- **Price:** per GB of traffic, lower per GB on larger purchases; time is free. `get_pricing` reads the live price list. Both pools cost the same.
+- **Price:** Account balance is bought in GB. The serving exit country determines how much balance a GB of Pool Gateway traffic consumes. Read the current tiers and volume discounts in the [pricing API](https://api.proxies.sx/v1/pricing). Capped keys and wallet purchases meter one GB per GB of traffic.
 - **Proxy password.** The gateway password is the account's proxy password (`pool_get_my_credentials`), or a `pak_` key. It is not the account login password.
 
 ### Gateway errors
@@ -90,9 +90,10 @@ A tool that fails returns an MCP error result (`isError: true`) whose text ends 
 
 | Mode | Set | Tools |
 |---|---|---|
-| **API key** (standard) | `PROXIES_API_KEY` | the default toolset (20 tools), or every API-key tool with `--toolset=full` |
-| **x402 wallet** (optional) | `AGENT_WALLET_KEY` | the x402 wallet group plus the tools marked "also listed in wallet mode" |
-| **Both** | both variables | both of the above |
+| **Public** | No credentials | 5 tools on either transport |
+| **API key** | `PROXIES_API_KEY` locally, or a bearer key on the hosted server | 20 by default, 96 with the full toolset |
+| **x402 wallet** (optional) | `AGENT_WALLET_KEY` | 21 locally, including 5 public tools and 16 wallet tools |
+| **Both** | both variables | 36 by default, 112 with the full toolset (local only) |
 
 ### Toolsets
 
@@ -117,7 +118,7 @@ The wallet tools are not affected by the toolset: they are always listed when `A
 
 ## Usage with MCP clients
 
-Every client runs the same command, `npx -y @proxies-sx/mcp-server`, with `PROXIES_API_KEY` in the environment.
+The examples below start the local stdio server with `npx -y @proxies-sx/mcp-server`. Clients that support Streamable HTTP can instead connect to `https://api.proxies.sx/mcp`.
 
 ### Claude Code
 

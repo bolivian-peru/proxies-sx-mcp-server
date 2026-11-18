@@ -67,7 +67,7 @@ Rules:
 - Sticky holds the device, not the IP: a mobile carrier can change the exit IP.
 - Limits per account: 500 concurrent connections, 250 sessions.
 - Password: the proxy password from `pool_get_my_credentials`, or a `pak_` key. Not the account login password.
-- Price: per GB, lower per GB on larger purchases, time is free. Read it live with `get_pricing`.
+- Account balance is bought in GB. The serving exit country determines how much balance a GB of Pool Gateway traffic consumes. Read the current tiers and volume discounts in the [pricing API](https://api.proxies.sx/v1/pricing). Capped keys and wallet purchases meter one GB per GB of traffic.
 
 Typical flow:
 
