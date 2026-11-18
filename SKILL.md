@@ -64,7 +64,7 @@ Username grammar: `psx_<account>-<pool>-<country>[-token-value ...]`. Let `pool_
 - `sticky`, `hard` and `auto*` persist across connections only with `-sid-<id>`. `-session-` is ignored by the gateway without an error.
 - Sticky holds the device, not the IP: a mobile carrier can change the exit IP. For an address that stays, use a residential peer or a Reserved IP.
 - Limits per account: 500 concurrent connections, 250 sessions.
-- You pay per GB; time is free. Never quote a price from memory: call `get_pricing`.
+- Account balance is bought in GB. The serving exit country determines how much balance a GB of Pool Gateway traffic consumes. Read the current tiers and volume discounts in the [pricing API](https://api.proxies.sx/v1/pricing). Capped keys and wallet purchases meter one GB per GB of traffic.
 - The gateway password is the proxy password from `pool_get_my_credentials` (or a `pak_` key), not the account login password.
 
 ## Common tasks
