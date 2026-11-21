@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "proxies-sx",
-      "source": "./",
+      "source": "./plugin",
       "description": "Residential and mobile proxies for AI agents: proxy URLs, live stock, IP rotation, Private modems"
     }
   ]
