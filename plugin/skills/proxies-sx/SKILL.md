@@ -5,7 +5,7 @@ description: Use the Proxies.sx MCP tools to get working residential or mobile p
 
 # Proxies.sx proxies
 
-The `proxies-sx` MCP server is the hosted Proxies.sx server. Without an API key it lists five public tools: `pool_get_stock`, `pool_get_facets`, `pool_build_proxy_url`, `pool_explain_error` and `get_service_status`. With a key it also lists the account tools (credentials, usage, billing, rotation, Private modems, support).
+The `proxies-sx` MCP server is the hosted Proxies.sx server. Without an API key it lists five public tools: `pool_get_stock`, `pool_get_facets`, `pool_build_proxy_url`, `pool_explain_error` and `get_service_status`. With a key it also lists the account tools: proxy credentials, usage, top-ups and pricing, Private modems (including modem IP rotation) and support tickets.
 
 ## Get a proxy URL
 
@@ -13,7 +13,7 @@ The `proxies-sx` MCP server is the hosted Proxies.sx server. Without an API key 
 2. With a key, call `pool_get_my_credentials` for the bare proxy username and password.
 3. Call `pool_build_proxy_url` with pool, country and any filters. Use the URL it returns as is.
 
-The gateway is `gw.proxies.sx`, port 7000 for HTTP and 7001 for SOCKS5. Routing lives in the username: `<username>-<pool>-<country>[-<token> <value> ...]`.
+The gateway is `gw.proxies.sx`, port 7000 for HTTP and 7001 for SOCKS5. Routing lives in the username: `<username>-<pool>-<country>[-<token>-<value> ...]`, for example `<username>-peer-us-sid-job1-rot-sticky`.
 
 ## Pools
 
@@ -34,7 +34,7 @@ Pass the gateway's error text to `pool_explain_error`. Common codes:
 
 - `E_AUTH_REQUIRED`, `E_AUTH_INVALID`: missing or wrong proxy credentials.
 - `E_BALANCE_EXHAUSTED`: the credentials are fine, the account has no traffic left.
-- `E_NO_STOCK_COUNTRY`: no endpoint matches that pool, country and filters right now; check `pool_get_stock` and relax the filters.
+- `E_NO_STOCK_COUNTRY`: no endpoint matched that pool, country and filters at that moment. Check `pool_get_stock`, relax the filters or try the other pool, and for steady volume in a country open a ticket with `create_support_ticket` so capacity is added for it.
 - `E_SESSION_LIMIT`, `E_RATE_LIMITED_CONN`: too many sessions or connections; close idle sessions.
 
 ## Account and prices
