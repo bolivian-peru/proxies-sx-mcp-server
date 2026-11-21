@@ -2,7 +2,7 @@
   "name": "proxies-sx",
   "displayName": "Proxies.sx",
   "version": "3.2.0",
-  "description": "Residential and mobile proxies for AI agents: Pool Gateway proxy URLs, live stock per country, IP rotation, Private modems, usage, billing and support, through the @proxies-sx/mcp-server MCP server.",
+  "description": "Residential and mobile proxies for AI agents: Pool Gateway proxy URLs, live stock per country, IP rotation, Private modems, usage, billing and support, through the hosted Proxies.sx MCP server.",
   "author": {
     "name": "Proxies.sx",
     "url": "https://proxies.sx"
@@ -33,7 +33,7 @@
     "PROXIES_API_KEY": {
       "type": "string",
       "title": "Proxies.sx API key",
-      "description": "psx_ key from https://client.proxies.sx/account. Leave empty to see only the public tools (stock, proxy URL format, error help).",
+      "description": "Create an API key at https://client.proxies.sx/account. Leave empty to use only the public tools (stock, proxy URL format, error help, service status).",
       "sensitive": true
     }
   },
