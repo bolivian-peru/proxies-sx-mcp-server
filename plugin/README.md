@@ -5,7 +5,7 @@ Residential and mobile proxies for AI agents. The plugin connects Claude Code to
 ## What you get
 
 - Without an API key: live stock per country, the proxy URL format, error explanations and service status.
-- With an API key: your proxy credentials, ready proxy URLs, IP rotation, usage, billing, Private modems and support tickets.
+- With an API key: your proxy credentials, ready proxy URLs, usage, top-ups, Private modems with IP rotation, and support tickets.
 
 ## Setup
 
